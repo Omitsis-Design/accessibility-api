@@ -1,0 +1,12 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+
+[environments.production.variables]
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "false"
+PUPPETEER_CACHE_DIR = "/tmp/.cache/puppeteer"
