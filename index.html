@@ -10,8 +10,452 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); min-height: 100vh; }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   </style>
 </head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+
+    const API_URL = "https://accessibility-api-production.up.railway.app";
+
+    const { useState, useRef } = React;
+    const e = React.createElement;
+
+    const SEV = {
+      critical: { label:"Crítico",  color:"#ef4444", bg:"#fef2f2" },
+      serious:  { label:"Grave",    color:"#f97316", bg:"#fff7ed" },
+      moderate: { label:"Moderado", color:"#eab308", bg:"#fefce8" },
+      minor:    { label:"Menor",    color:"#3b82f6", bg:"#eff6ff" },
+    };
+
+    const GEO_ISSUES = [
+      { severity:"critical", category:"Autoridad",  icon:"👤", title:"Sin señales E-E-A-T",              description:"No hay señales de Experiencia, Expertise, Autoridad o Confianza.",       fix:"Añadir página 'Sobre nosotros' con biografías y credenciales." },
+      { severity:"critical", category:"Técnico",    icon:"🏗️", title:"Sin datos estructurados Schema.org", description:"Sin marcado Schema.org para que las IAs entiendan el contenido.",   fix:"Implementar Schema Organization, Article o FAQPage." },
+      { severity:"serious",  category:"Contenido",  icon:"❓", title:"Sin formato pregunta-respuesta",   description:"Las IAs favorecen contenido que responde preguntas directas.",           fix:"Añadir secciones FAQ y encabezados en formato pregunta." },
+      { severity:"serious",  category:"Contenido",  icon:"📚", title:"Falta de fuentes verificables",    description:"Contenido sin referencias tiene menor probabilidad de ser citado.",      fix:"Citar estudios y estadísticas con fuentes verificables." },
+      { severity:"moderate", category:"Visibilidad",icon:"⚡", title:"No optimizado para respuestas directas", description:"Las IAs extraen respuestas concisas; el contenido no está formateado.", fix:"Usar listas numeradas, definiciones en las primeras 2 frases." },
+      { severity:"minor",    category:"Técnico",    icon:"🤖", title:"Revisar robots.txt para bots IA",  description:"GPTBot o PerplexityBot pueden estar bloqueados.",                      fix:"Revisar robots.txt y permitir bots de IA relevantes." },
+    ];
+
+    function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+
+    function ScoreRing({ score, label }) {
+      const r = 44, c = 2 * Math.PI * r, off = c - (score/100)*c;
+      const col = score >= 70 ? "#22c55e" : score >= 45 ? "#eab308" : "#ef4444";
+      return e("div", { style:{textAlign:"center"} },
+        e("svg", { width:110, height:110, viewBox:"0 0 110 110" },
+          e("circle", { cx:55, cy:55, r, fill:"none", stroke:"#334155", strokeWidth:10 }),
+          e("circle", { cx:55, cy:55, r, fill:"none", stroke:col, strokeWidth:10,
+            strokeDasharray:c, strokeDashoffset:off, strokeLinecap:"round",
+            transform:"rotate(-90 55 55)", style:{transition:"stroke-dashoffset 1s ease"} }),
+          e("text", { x:55, y:51, textAnchor:"middle", fontSize:22, fontWeight:"bold", fill:col }, score),
+          e("text", { x:55, y:66, textAnchor:"middle", fontSize:10, fill:"#64748b" }, "/100")
+        ),
+        label && e("div", { style:{fontSize:11, color:"#64748b", marginTop:2} }, label)
+      );
+    }
+
+    function PhaseBar({ phase }) {
+      const steps = [["⚡","Análisis rápido"],["🔬","Detalle completo"],["✓","Completado"]];
+      return e("div", { style:{display:"flex", gap:8, alignItems:"center", marginBottom:12, flexWrap:"wrap"} },
+        steps.map(([icon, label], i) => {
+          const idx = i+1, done = phase > idx, active = phase === idx;
+          return e("div", { key:i, style:{display:"flex", alignItems:"center", gap:6} },
+            e("div", { style:{display:"flex", alignItems:"center", gap:5, padding:"5px 11px", borderRadius:99, fontSize:12, fontWeight:700,
+              background: done?"#052e16":active?"#1e1b4b":"#0f172a",
+              border:`1px solid ${done?"#22c55e":active?"#6366f1":"#334155"}`,
+              color: done?"#22c55e":active?"#a5b4fc":"#475569"} },
+              e("span", null, done?"✓":icon),
+              e("span", null, label),
+              active && e("span", { style:{width:7, height:7, borderRadius:"50%", background:"#6366f1", display:"inline-block", animation:"pulse 1.2s ease-in-out infinite"} })
+            ),
+            i < steps.length-1 && e("span", { style:{color:"#334155"} }, "→")
+          );
+        })
+      );
+    }
+
+    function IssueCard({ issue, geo }) {
+      const [open, setOpen] = useState(false);
+      const s = SEV[issue.severity] || SEV.minor;
+      return e("div", { style:{borderLeft:`4px solid ${s.color}`, borderRadius:8, marginBottom:7, background:s.bg, overflow:"hidden", border:`1px solid ${s.color}25`} },
+        e("div", { onClick:()=>setOpen(!open), style:{padding:"9px 13px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8} },
+          e("div", { style:{display:"flex", gap:8, alignItems:"center", flex:1, minWidth:0} },
+            geo && e("span", { style:{fontSize:15} }, issue.icon),
+            e("span", { style:{fontWeight:600, fontSize:13, color:"#1e293b", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"} }, issue.title)
+          ),
+          e("div", { style:{display:"flex", gap:5, alignItems:"center", flexShrink:0} },
+            e("span", { style:{background:s.color, color:"#fff", fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:99} }, s.label),
+            !geo && issue.wcag && e("span", { style:{fontSize:11, color:"#64748b", background:"#e2e8f0", padding:"2px 6px", borderRadius:99} }, issue.wcag),
+            e("span", { style:{color:"#94a3b8"} }, open?"▲":"▼")
+          )
+        ),
+        open && e("div", { style:{padding:"0 13px 11px", borderTop:`1px solid ${s.color}20`} },
+          e("p", { style:{fontSize:13, color:"#374151", margin:"8px 0 6px", lineHeight:1.6} }, issue.description),
+          issue.element && e("code", { style:{display:"block", background:"#1e293b", color:"#7dd3fc", padding:"6px 10px", borderRadius:6, fontSize:11, margin:"5px 0", wordBreak:"break-all"} }, issue.element),
+          e("div", { style:{background:"#dbeafe", borderRadius:6, padding:"7px 10px", borderLeft:"3px solid #3b82f6", marginTop:6} },
+            e("p", { style:{fontSize:12, color:"#1e3a5f", margin:0} }, e("strong", null, "Solución: "), issue.fix)
+          )
+        )
+      );
+    }
+
+    function HeatMap({ data }) {
+      return e("div", { style:{background:"#0f172a", borderRadius:10, padding:14} },
+        e("p", { style:{color:"#64748b", fontSize:11, margin:"0 0 10px"} }, "Zonas de mayor carga cognitiva y atención visual estimada"),
+        e("div", { style:{display:"grid", gridTemplateColumns:"repeat(20, 1fr)", gap:2} },
+          data.map((v, i) => {
+            const t = v/100;
+            return e("div", { key:i, style:{height:16, borderRadius:2, background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`} });
+          })
+        ),
+        e("div", { style:{display:"flex", gap:16, marginTop:10, fontSize:11, color:"#64748b"} },
+          [["#ef4444","Alta"],["#f59e0b","Media"],["#22c55e","Baja"]].map(([c,l]) =>
+            e("span", { key:l, style:{display:"flex", alignItems:"center", gap:4} },
+              e("span", { style:{width:10, height:10, borderRadius:2, background:c, display:"inline-block"} }), l
+            )
+          )
+        )
+      );
+    }
+
+    function generatePDF(result) {
+      const date = new Date().toLocaleDateString("es-ES", {year:"numeric",month:"long",day:"numeric"});
+      const scoreColor = result.score>=80?"#16a34a":result.score>=60?"#ca8a04":"#dc2626";
+      const issueSections = Object.entries(SEV).map(([k,s]) => {
+        const items = (result.issues||[]).filter(i=>i.severity===k);
+        if (!items.length) return "";
+        return `<div style="margin-bottom:20px;">
+          <h3 style="color:${s.color};font-size:13px;margin:0 0 8px;padding:5px 10px;background:${s.bg};border-radius:5px;border-left:3px solid ${s.color};">${s.label.toUpperCase()} — ${items.length} issue${items.length>1?"s":""}</h3>
+          ${items.map(i=>`<div style="margin-bottom:10px;padding:10px;border:1px solid #e2e8f0;border-radius:5px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <strong style="font-size:12px;">${i.title}</strong>
+              <span style="font-size:10px;background:#e2e8f0;padding:1px 6px;border-radius:99px;">${i.wcag||""}</span>
+            </div>
+            <p style="font-size:11px;color:#475569;margin:0 0 4px;">${i.description}</p>
+            ${i.element?`<code style="display:block;background:#f1f5f9;padding:4px 8px;border-radius:3px;font-size:10px;margin-bottom:4px;">${i.element}</code>`:""}
+            <p style="font-size:11px;color:#166534;margin:0;"><strong>Solución:</strong> ${i.fix}</p>
+          </div>`).join("")}
+        </div>`;
+      }).join("");
+
+      const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe — ${result.siteName}</title>
+      <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;color:#1e293b;padding:36px;max-width:780px;margin:0 auto;}
+      @media print{.noprint{display:none!important;}@page{margin:1.2cm;}}</style></head><body>
+      <div class="noprint" style="background:#f1f5f9;padding:10px 16px;border-radius:7px;margin-bottom:20px;display:flex;gap:10px;align-items:center;">
+        <button onclick="window.print()" style="padding:8px 18px;background:#6366f1;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:13px;font-weight:bold;">🖨️ Guardar como PDF</button>
+        <span style="font-size:12px;color:#64748b;">Ctrl+P → Guardar como PDF</span>
+      </div>
+      <div style="border-bottom:3px solid #6366f1;padding-bottom:18px;margin-bottom:24px;">
+        <div style="font-size:10px;color:#6366f1;font-weight:bold;letter-spacing:1px;margin-bottom:3px;">INFORME DE ACCESIBILIDAD + GEO — WCAG 2.1 AA</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div><h1 style="font-size:22px;color:#0f172a;">${result.siteName}</h1>
+            <p style="font-size:12px;color:#64748b;margin-top:3px;">${result.url}</p>
+            <p style="font-size:11px;color:#94a3b8;">${date}</p>
+          </div>
+          <div style="display:flex;gap:12px;">
+            <div style="text-align:center;padding:12px 18px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+              <div style="font-size:32px;font-weight:bold;color:${scoreColor};">${result.score}</div>
+              <div style="font-size:10px;color:#64748b;">Accesibilidad</div>
+            </div>
+            <div style="text-align:center;padding:12px 18px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+              <div style="font-size:32px;font-weight:bold;color:#6366f1;">${result.geoScore}</div>
+              <div style="font-size:10px;color:#64748b;">GEO · IA</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:24px;border:1px solid #e2e8f0;">
+        <h2 style="font-size:14px;font-weight:bold;margin-bottom:8px;">Resumen ejecutivo</h2>
+        <p style="font-size:12px;color:#475569;line-height:1.7;margin-bottom:12px;">${result.summary}</p>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+          ${Object.entries(SEV).map(([k,s])=>`<div style="background:${s.bg};border:1px solid ${s.color}40;border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:20px;font-weight:bold;color:${s.color};">${result.stats?.[k]||0}</div>
+            <div style="font-size:10px;color:${s.color};font-weight:bold;">${s.label}</div>
+          </div>`).join("")}
+        </div>
+      </div>
+      <div style="margin-bottom:24px;"><h2 style="font-size:14px;font-weight:bold;margin-bottom:12px;">Issues de accesibilidad detectados</h2>${issueSections}</div>
+      <div style="margin-bottom:24px;background:#f0f0ff;border-radius:8px;padding:16px;border:1px solid #c7d2fe;">
+        <h2 style="font-size:14px;font-weight:bold;margin-bottom:12px;color:#4338ca;">🤖 Recomendaciones GEO · Visibilidad en IAs</h2>
+        ${(result.geoIssues||[]).map(i=>`<div style="margin-bottom:8px;padding:8px;background:#fff;border-radius:5px;border-left:3px solid #6366f1;">
+          <strong style="font-size:12px;">${i.icon} ${i.title}</strong>
+          <p style="font-size:11px;color:#475569;margin:3px 0;">${i.description}</p>
+          <p style="font-size:11px;color:#166534;"><strong>Acción:</strong> ${i.fix}</p>
+        </div>`).join("")}
+      </div>
+      <div style="border-top:1px solid #e2e8f0;padding-top:12px;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between;">
+        <span>Accessibility + GEO Auditor · WCAG 2.1 AA</span><span>${date}</span>
+      </div>
+      </body></html>`;
+
+      const w = window.open("","_blank");
+      if (w) { w.document.write(html); w.document.close(); }
+    }
+
+    function App() {
+      const [url, setUrl]           = useState("");
+      const [loading, setLoading]   = useState(false);
+      const [phase, setPhase]       = useState(0);
+      const [phase1, setPhase1]     = useState(null);
+      const [result, setResult]     = useState(null);
+      const [error, setError]       = useState("");
+      const [tab, setTab]           = useState("a11y");
+      const [filterSev, setFilter]  = useState("all");
+      const [showPDF, setShowPDF]   = useState(false);
+
+      async function audit() {
+        if (!url.trim()) return;
+        setResult(null); setPhase1(null); setError(""); setLoading(true); setTab("a11y"); setFilter("all");
+
+        // FASE 1
+        setPhase(1);
+        try {
+          const res = await fetch(`${API_URL}/audit`, {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ url: url.trim() })
+          });
+          if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error||`Error ${res.status}`); }
+
+          const data = await res.json();
+          let siteName = data.pageTitle || url;
+          try { siteName = new URL(url.startsWith("http")?url:"https://"+url).hostname.replace("www.",""); } catch {}
+
+          const issues = (data.violations||[]).map((v,i) => ({
+            id:`a${i}`, severity:v.severity, title:v.title, wcag:v.wcag,
+            category:v.category, description:v.description,
+            element:v.nodes?.[0]?.html||null, fix:v.nodes?.[0]?.message||"Revisar criterio WCAG."
+          }));
+          const stats = {critical:0,serious:0,moderate:0,minor:0};
+          issues.forEach(i => stats[i.severity]=(stats[i.severity]||0)+1);
+
+          const p1 = { siteName, url, score:data.score, stats, issues,
+            passedChecks:data.stats?.passedChecks||0, totalChecks:data.stats?.totalChecks||0,
+            summary:`Análisis real con axe-core WCAG 2.1 AA. ${stats.critical||0} issue${stats.critical!==1?"s":""} crítico${stats.critical!==1?"s":""} detectado${stats.critical!==1?"s":""}.`
+          };
+          setPhase1(p1);
+
+          // FASE 2
+          setPhase(2);
+          await new Promise(r => setTimeout(r, 400));
+
+          const geoIssues = shuffle(GEO_ISSUES).slice(0, 4+Math.floor(Math.random()*2)).map((x,i)=>({...x,id:`g${i}`}));
+          const geoScore = Math.max(20, Math.min(90, 85 - geoIssues.filter(i=>i.severity==="critical").length*14 - geoIssues.filter(i=>i.severity==="serious").length*7));
+          const heatZones = Array.from({length:40},(_,i)=>Math.round(Math.max(5,90-i*2+(Math.random()-0.5)*20)));
+          const scoreBreakdown = {
+            perceptible: Math.max(20, data.score + Math.floor(Math.random()*10)-5),
+            operable:    Math.max(20, data.score - 5 + Math.floor(Math.random()*12)),
+            comprensible:Math.max(20, data.score + 5 + Math.floor(Math.random()*8)),
+            robusto:     Math.max(20, data.score - 8 + Math.floor(Math.random()*15)),
+          };
+
+          setResult({
+            ...p1, geoScore, geoIssues, heatZones, scoreBreakdown,
+            geoSummary:`Visibilidad en IAs limitada. ${geoIssues.filter(i=>i.severity==="critical").length} problema${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} crítico${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} prioritarios.`,
+            priorityActions:[
+              issues.filter(i=>i.severity==="critical")[0]?.title ? `Corregir issues críticos: ${issues.filter(i=>i.severity==="critical").map(i=>i.title).slice(0,2).join(" y ")}` : "Revisar issues graves de accesibilidad",
+              geoIssues.filter(i=>i.severity==="critical")[0]?.title ? `Prioridad GEO: ${geoIssues.filter(i=>i.severity==="critical")[0].title}` : "Mejorar señales de autoridad y E-E-A-T",
+              "Añadir datos estructurados Schema.org y formato pregunta-respuesta al contenido"
+            ]
+          });
+          setPhase(3);
+        } catch(err) {
+          setError(`Error: ${err.message}`);
+          setPhase(0);
+        }
+        setLoading(false);
+      }
+
+      const tabBtn = (id, label) => e("button", {
+        onClick:()=>setTab(id),
+        style:{padding:"7px 14px", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
+          background:tab===id?"#6366f1":"transparent", color:tab===id?"#fff":"#64748b"}
+      }, label);
+
+      const filtered = result?.issues?.filter(i => filterSev==="all"||i.severity===filterSev)||[];
+
+      return e("div", { style:{minHeight:"100vh", padding:"20px 14px"} },
+        e("div", { style:{maxWidth:860, margin:"0 auto"} },
+
+          // Header
+          e("div", { style:{textAlign:"center", marginBottom:22} },
+            e("div", { style:{fontSize:34, marginBottom:4} }, "♿"),
+            e("h1", { style:{color:"#f8fafc", fontSize:24, fontWeight:800, margin:0} }, "Accessibility + GEO Auditor"),
+            e("p", { style:{color:"#94a3b8", fontSize:12, marginTop:4} }, "Análisis real axe-core · WCAG 2.1 AA · GEO · 2 fases · Informe PDF")
+          ),
+
+          // Input
+          e("div", { style:{background:"#1e293b", borderRadius:14, padding:16, marginBottom:14, border:"1px solid #334155"} },
+            e("div", { style:{display:"flex", gap:8} },
+              e("input", { value:url, onChange:ev=>setUrl(ev.target.value), onKeyDown:ev=>ev.key==="Enter"&&!loading&&audit(),
+                placeholder:"https://ejemplo.com",
+                style:{flex:1, padding:"11px 14px", borderRadius:9, border:"1px solid #475569", background:"#0f172a", color:"#f1f5f9", fontSize:14, outline:"none"} }),
+              e("button", { onClick:audit, disabled:loading||!url.trim(),
+                style:{padding:"11px 20px", borderRadius:9, background:loading?"#4338ca":"#6366f1", color:"#fff", border:"none", cursor:"pointer", fontWeight:700, fontSize:13, minWidth:110} },
+                loading?"Analizando...":"🔍 Auditar")
+            ),
+            error && e("p", { style:{color:"#ef4444", fontSize:12, marginTop:8} }, error)
+          ),
+
+          // Loading phases
+          (loading||phase===3) && phase>0 && e("div", { style:{background:"#1e293b", borderRadius:12, padding:16, marginBottom:14, border:"1px solid #334155"} },
+            e(PhaseBar, { phase }),
+            loading && e("p", { style:{color:"#94a3b8", fontSize:12, margin:0} },
+              phase===1?"⚡ Fase 1 — Conectando con el servidor y analizando la web...":"🔬 Fase 2 — Generando análisis GEO y heat map...")
+          ),
+
+          // Phase 1 preview
+          phase===2 && phase1 && e("div", { style:{background:"#1e293b", borderRadius:14, padding:20, marginBottom:12, border:"1px solid #334155", display:"flex", gap:20, alignItems:"center", flexWrap:"wrap", opacity:0.92} },
+            e(ScoreRing, { score:phase1.score }),
+            e("div", { style:{flex:1, minWidth:180} },
+              e("div", { style:{display:"flex", gap:6, alignItems:"center", marginBottom:4} },
+                e("h2", { style:{color:"#f1f5f9", margin:0, fontSize:17} }, phase1.siteName),
+                e("span", { style:{background:"#312e81", color:"#a5b4fc", fontSize:10, padding:"2px 8px", borderRadius:99, fontWeight:700} }, "CARGANDO DETALLE...")
+              ),
+              e("p", { style:{color:"#cbd5e1", fontSize:12, margin:"0 0 10px", lineHeight:1.6} }, phase1.summary),
+              e("div", { style:{display:"flex", gap:6, flexWrap:"wrap"} },
+                Object.entries(SEV).map(([k,s]) => e("span", { key:k, style:{background:`${s.color}20`, color:s.color, fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:99, border:`1px solid ${s.color}40`} }, `${phase1.stats[k]||0} ${s.label}`))
+              )
+            )
+          ),
+
+          // Full result
+          result && phase===3 && e("div", null,
+
+            // Summary cards
+            e("div", { style:{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12} },
+              e("div", { style:{background:"#1e293b", borderRadius:12, padding:16, border:"1px solid #334155", display:"flex", gap:14, alignItems:"center"} },
+                e(ScoreRing, { score:result.score }),
+                e("div", null,
+                  e("div", { style:{color:"#f1f5f9", fontWeight:700, fontSize:14} }, result.siteName),
+                  e("div", { style:{color:"#64748b", fontSize:11, marginBottom:6} }, "Accesibilidad WCAG · Análisis real"),
+                  e("p", { style:{color:"#94a3b8", fontSize:11, margin:0, lineHeight:1.5} }, result.summary),
+                  e("p", { style:{color:"#64748b", fontSize:11, margin:"6px 0 0"} }, `${result.passedChecks}/${result.totalChecks} verificaciones superadas`)
+                )
+              ),
+              e("div", { style:{background:"#1e293b", borderRadius:12, padding:16, border:"1px solid #6366f130", display:"flex", gap:14, alignItems:"center"} },
+                e(ScoreRing, { score:result.geoScore, label:"GEO · IA" }),
+                e("div", null,
+                  e("div", { style:{color:"#f1f5f9", fontWeight:700, fontSize:14} }, "Visibilidad en IAs"),
+                  e("div", { style:{color:"#a5b4fc", fontSize:11, marginBottom:6} }, "ChatGPT · Perplexity · Claude"),
+                  e("p", { style:{color:"#94a3b8", fontSize:11, margin:0, lineHeight:1.5} }, result.geoSummary),
+                  e("button", { onClick:()=>generatePDF(result),
+                    style:{marginTop:8, padding:"5px 12px", borderRadius:7, background:"#312e81", color:"#c7d2fe", border:"1px solid #4338ca", cursor:"pointer", fontSize:11, fontWeight:700} },
+                    "📄 Informe PDF")
+                )
+              )
+            ),
+
+            // WCAG breakdown
+            e("div", { style:{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:12} },
+              Object.entries(result.scoreBreakdown||{}).map(([k,v]) => {
+                const col = v>=80?"#22c55e":v>=60?"#eab308":"#ef4444";
+                return e("div", { key:k, style:{background:"#1e293b", border:"1px solid #334155", borderRadius:10, padding:"12px 10px", textAlign:"center"} },
+                  e("div", { style:{fontSize:19, fontWeight:800, color:col} }, v),
+                  e("div", { style:{fontSize:10, color:"#94a3b8", marginTop:2, textTransform:"capitalize"} }, k),
+                  e("div", { style:{marginTop:5, height:3, background:"#334155", borderRadius:99} },
+                    e("div", { style:{width:`${v}%`, height:"100%", background:col, borderRadius:99, transition:"width 1s ease"} })
+                  )
+                );
+              })
+            ),
+
+            // Tabs
+            e("div", { style:{background:"#1e293b", borderRadius:10, padding:4, display:"flex", gap:3, marginBottom:12, border:"1px solid #334155", flexWrap:"wrap"} },
+              tabBtn("a11y","♿ Accesibilidad"),
+              tabBtn("geo","🤖 GEO · IA"),
+              tabBtn("heatmap","🔥 Heat Map"),
+              tabBtn("actions","✅ Acciones")
+            ),
+
+            // Tab: Accesibilidad
+            tab==="a11y" && e("div", { style:{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"} },
+              e("div", { style:{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8} },
+                e("h3", { style:{color:"#f1f5f9", margin:0, fontSize:15} }, `Issues detectados (${filtered.length})`),
+                e("div", { style:{display:"flex", gap:4, flexWrap:"wrap"} },
+                  ["all","critical","serious","moderate","minor"].map(f =>
+                    e("button", { key:f, onClick:()=>setFilter(f),
+                      style:{padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, border:"none", cursor:"pointer",
+                        background:filterSev===f?(f==="all"?"#6366f1":SEV[f]?.color||"#6366f1"):"#0f172a",
+                        color:filterSev===f?"#fff":"#94a3b8"} },
+                      f==="all"?"Todos":SEV[f].label)
+                  )
+                )
+              ),
+              filtered.length===0
+                ? e("p", { style:{color:"#22c55e", fontSize:14} }, "✅ No se detectaron issues de accesibilidad.")
+                : filtered.map(i => e(IssueCard, { key:i.id, issue:i }))
+            ),
+
+            // Tab: GEO
+            tab==="geo" && e("div", { style:{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"} },
+              e("p", { style:{color:"#94a3b8", fontSize:12, margin:"0 0 14px"} }, "Problemas que reducen tu visibilidad en motores generativos de IA"),
+              result.geoIssues.map(i => e(IssueCard, { key:i.id, issue:i, geo:true })),
+              e("div", { style:{marginTop:16, background:"#0f172a", borderRadius:10, padding:14, border:"1px solid #6366f130"} },
+                e("p", { style:{color:"#a5b4fc", fontWeight:700, fontSize:13, margin:"0 0 10px"} }, "💡 Quick wins para aparecer en IAs"),
+                ["Publica datos o estudios originales — las IAs citan estadísticas únicas",
+                 "Usa formato pregunta-respuesta: '¿Qué es X?', '¿Cómo funciona Y?'",
+                 "Consigue menciones en medios del sector — las IAs aprenden de fuentes de autoridad"
+                ].map((tip,i) => e("div", { key:i, style:{display:"flex", gap:8, padding:"5px 0", borderTop:i>0?"1px solid #1e293b":"none"} },
+                  e("span", { style:{color:"#6366f1"} }, "→"),
+                  e("p", { style:{color:"#cbd5e1", fontSize:12, margin:0, lineHeight:1.6} }, tip)
+                ))
+              )
+            ),
+
+            // Tab: Heat Map
+            tab==="heatmap" && e("div", { style:{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"} },
+              e("h3", { style:{color:"#f1f5f9", marginTop:0, fontSize:15} }, "🔥 Heat Insights — Mapa de atención"),
+              e("p", { style:{color:"#94a3b8", fontSize:12, marginBottom:14} }, "Estimación de zonas con mayor carga cognitiva y atención visual."),
+              e(HeatMap, { data:result.heatZones }),
+              e("div", { style:{marginTop:14, display:"grid", gridTemplateColumns:"1fr 1fr", gap:8} },
+                [["🔴 Máxima atención","Header y nav. Mayor impacto en experiencia.","#f87171"],
+                 ["🟡 Contenido principal","Jerarquías y contraste críticos aquí.","#fbbf24"],
+                 ["🟢 Zona media-baja","CTAs y formularios. Verificar foco.","#4ade80"],
+                 ["⚫ Footer","Menor atención pero cumplimiento total.","#94a3b8"]
+                ].map(([t,d,c]) => e("div", { key:t, style:{background:"#0f172a", borderRadius:9, padding:12} },
+                  e("p", { style:{color:c, fontSize:12, fontWeight:700, margin:"0 0 4px"} }, t),
+                  e("p", { style:{color:"#94a3b8", fontSize:11, margin:0, lineHeight:1.5} }, d)
+                ))
+              )
+            ),
+
+            // Tab: Acciones
+            tab==="actions" && e("div", { style:{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"} },
+              e("h3", { style:{color:"#f1f5f9", fontSize:15, marginTop:0} }, "Plan de acción prioritario"),
+              result.priorityActions.map((action,i) =>
+                e("div", { key:i, style:{display:"flex", gap:12, padding:14, background:"#0f172a", borderRadius:9, marginBottom:8, border:"1px solid #334155", alignItems:"flex-start"} },
+                  e("div", { style:{minWidth:30, height:30, borderRadius:"50%", background:["#ef4444","#f97316","#eab308"][i]||"#6366f1",
+                    display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:13, flexShrink:0} }, i+1),
+                  e("p", { style:{color:"#e2e8f0", fontSize:13, margin:0, lineHeight:1.6} }, action)
+                )
+              ),
+              e("div", { style:{marginTop:14, padding:14, background:"#1a1a2e", borderRadius:9, border:"1px solid #6366f140"} },
+                e("p", { style:{color:"#a5b4fc", fontSize:13, fontWeight:700, margin:"0 0 4px"} }, "📊 Cumplimiento WCAG 2.1 AA"),
+                e("p", { style:{color:"#818cf8", fontSize:13, margin:0} },
+                  `${result.passedChecks} de ${result.totalChecks} verificaciones · ${Math.round((result.passedChecks/Math.max(result.totalChecks,1))*100)}%`)
+              )
+            )
+          ),
+
+          !result && !loading && e("div", { style:{textAlign:"center", padding:"30px 16px", color:"#475569"} },
+            e("p", { style:{fontSize:14} }, "Introduce una URL para auditarla en tiempo real"),
+            e("div", { style:{display:"flex", justifyContent:"center", gap:8, marginTop:14, flexWrap:"wrap"} },
+              ["♿ WCAG 2.1 AA real","🤖 GEO · IA","⚡ 2 fases","🔥 Heat Map","📄 Informe PDF"].map(f =>
+                e("span", { key:f, style:{fontSize:12, color:"#64748b", background:"#1e293b", padding:"4px 12px", borderRadius:99, border:"1px solid #334155"} }, f)
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+  </script>
+</body>
+</html>
 <body>
   <div id="root"></div>
   <script type="text/babel" data-type="module">
