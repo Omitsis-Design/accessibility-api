@@ -1,4 +1,25 @@
-import { useState } from "react";
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accessibility + GEO Auditor</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); min-height: 100vh; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const e = React.createElement;
+
+const API_URL = "https://accessibility-api-production.up.railway.app";
 
 const SEV = {
   critical: { label:"Crítico",  color:"#ef4444", bg:"#fef2f2" },
@@ -10,8 +31,8 @@ const SEV = {
 const ISSUES = [
   { severity:"critical", title:"Imágenes sin texto alternativo", wcag:"1.1.1", category:"Perceptible", description:"Imágenes de contenido sin atributo alt descriptivo.", element:'<img src="hero.jpg">', fix:"Añadir alt descriptivo a todas las imágenes de contenido." },
   { severity:"critical", title:"Contraste insuficiente en texto", wcag:"1.4.3", category:"Perceptible", description:"Ratio de contraste inferior al mínimo 4.5:1 requerido.", element:'<p style="color:#aaa">', fix:"Aumentar contraste a mínimo 4.5:1." },
-  { severity:"critical", title:"Formularios sin etiquetas", wcag:"1.3.1", category:"Perceptible", description:"Campos de formulario sin labels asociados correctamente.", element:'<input type="email" placeholder="Email">', fix:"Asociar cada input con un label mediante for/id o aria-label." },
-  { severity:"serious",  title:"Foco no visible en elementos", wcag:"2.4.7", category:"Operable", description:"El indicador de foco está desactivado con outline:none.", element:"button { outline: none; }", fix:"Mantener o mejorar el indicador de foco." },
+  { severity:"critical", title:"Formularios sin etiquetas", wcag:"1.3.1", category:"Perceptible", description:"Campos de formulario sin labels asociados.", element:'<input type="email" placeholder="Email">', fix:"Asociar cada input con un label mediante for/id o aria-label." },
+  { severity:"serious",  title:"Foco no visible en elementos", wcag:"2.4.7", category:"Operable", description:"El indicador de foco está desactivado.", element:"button { outline: none; }", fix:"Mantener o mejorar el indicador de foco." },
   { severity:"serious",  title:"Sin landmark regions ARIA", wcag:"1.3.6", category:"Perceptible", description:"La página no define regiones semánticas.", element:'<div id="content">', fix:"Usar elementos HTML5 semánticos o roles ARIA." },
   { severity:"moderate", title:"Links sin texto descriptivo", wcag:"2.4.4", category:"Operable", description:"Enlaces con textos genéricos como 'ver más'.", element:'<a href="/x">Ver más</a>', fix:"Usar textos de enlace descriptivos del destino." },
   { severity:"moderate", title:"Idioma de página no declarado", wcag:"3.1.1", category:"Comprensible", description:"Falta atributo lang en el elemento html.", element:"<html>", fix:"Añadir lang='es' al elemento html." },
@@ -31,603 +52,472 @@ const GEO_ISSUES = [
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 function calcScore(issues) {
   const w = {critical:15,serious:8,moderate:4,minor:1};
-  return Math.max(10, Math.min(95, 100 - issues.reduce((s,i) => s+(w[i.severity]||1), 0)));
+  return Math.max(10, Math.min(95, 100 - issues.reduce((s,i)=>s+(w[i.severity]||1),0)));
 }
 
 function ScoreRing({ score, label }) {
-  const r = 44, c = 2 * Math.PI * r, off = c - (score/100)*c;
-  const col = score >= 70 ? "#22c55e" : score >= 45 ? "#eab308" : "#ef4444";
-  return (
-    <div style={{textAlign:"center"}}>
-      <svg width="110" height="110" viewBox="0 0 110 110">
-        <circle cx="55" cy="55" r={r} fill="none" stroke="#334155" strokeWidth="10"/>
-        <circle cx="55" cy="55" r={r} fill="none" stroke={col} strokeWidth="10"
-          strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round"
-          transform="rotate(-90 55 55)" style={{transition:"stroke-dashoffset 1s ease"}}/>
-        <text x="55" y="51" textAnchor="middle" fontSize="22" fontWeight="bold" fill={col}>{score}</text>
-        <text x="55" y="66" textAnchor="middle" fontSize="10" fill="#64748b">/100</text>
-      </svg>
-      {label && <div style={{fontSize:11, color:"#64748b", marginTop:2}}>{label}</div>}
-    </div>
+  const r=44, c=2*Math.PI*r, off=c-(score/100)*c;
+  const col = score>=70?"#22c55e":score>=45?"#eab308":"#ef4444";
+  return e("div",{style:{textAlign:"center"}},
+    e("svg",{width:110,height:110,viewBox:"0 0 110 110"},
+      e("circle",{cx:55,cy:55,r,fill:"none",stroke:"#334155",strokeWidth:10}),
+      e("circle",{cx:55,cy:55,r,fill:"none",stroke:col,strokeWidth:10,
+        strokeDasharray:c,strokeDashoffset:off,strokeLinecap:"round",
+        transform:"rotate(-90 55 55)",style:{transition:"stroke-dashoffset 1s ease"}}),
+      e("text",{x:55,y:51,textAnchor:"middle",fontSize:22,fontWeight:"bold",fill:col},score),
+      e("text",{x:55,y:66,textAnchor:"middle",fontSize:10,fill:"#64748b"},"/100")
+    ),
+    label && e("div",{style:{fontSize:11,color:"#64748b",marginTop:2}},label)
   );
 }
 
 function IssueCard({ issue, geo }) {
   const [open, setOpen] = useState(false);
-  const s = SEV[issue.severity] || SEV.minor;
-  return (
-    <div style={{borderLeft:`4px solid ${s.color}`, borderRadius:8, marginBottom:7, background:s.bg, overflow:"hidden", border:`1px solid ${s.color}25`}}>
-      <div onClick={() => setOpen(!open)} style={{padding:"9px 13px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8}}>
-        <div style={{display:"flex", gap:8, alignItems:"center", flex:1, minWidth:0}}>
-          {geo && <span style={{fontSize:15}}>{issue.icon}</span>}
-          <span style={{fontWeight:600, fontSize:13, color:"#1e293b", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{issue.title}</span>
-        </div>
-        <div style={{display:"flex", gap:5, alignItems:"center", flexShrink:0}}>
-          <span style={{background:s.color, color:"#fff", fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:99}}>{s.label}</span>
-          {!geo && issue.wcag && <span style={{fontSize:11, color:"#64748b", background:"#e2e8f0", padding:"2px 6px", borderRadius:99}}>{issue.wcag}</span>}
-          <span style={{color:"#94a3b8"}}>{open?"▲":"▼"}</span>
-        </div>
-      </div>
-      {open && (
-        <div style={{padding:"0 13px 11px", borderTop:`1px solid ${s.color}20`}}>
-          <p style={{fontSize:13, color:"#374151", margin:"8px 0 6px", lineHeight:1.6}}>{issue.description}</p>
-          {issue.element && <code style={{display:"block", background:"#1e293b", color:"#7dd3fc", padding:"6px 10px", borderRadius:6, fontSize:11, margin:"5px 0", wordBreak:"break-all"}}>{issue.element}</code>}
-          <div style={{background:"#dbeafe", borderRadius:6, padding:"7px 10px", borderLeft:"3px solid #3b82f6", marginTop:6}}>
-            <p style={{fontSize:12, color:"#1e3a5f", margin:0}}><strong>Solución:</strong> {issue.fix}</p>
-          </div>
-        </div>
-      )}
-    </div>
+  const s = SEV[issue.severity]||SEV.minor;
+  return e("div",{style:{borderLeft:`4px solid ${s.color}`,borderRadius:8,marginBottom:7,background:s.bg,overflow:"hidden",border:`1px solid ${s.color}25`}},
+    e("div",{onClick:()=>setOpen(!open),style:{padding:"9px 13px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}},
+      e("div",{style:{display:"flex",gap:8,alignItems:"center",flex:1,minWidth:0}},
+        geo && e("span",{style:{fontSize:15}},issue.icon),
+        e("span",{style:{fontWeight:600,fontSize:13,color:"#1e293b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},issue.title)
+      ),
+      e("div",{style:{display:"flex",gap:5,alignItems:"center",flexShrink:0}},
+        e("span",{style:{background:s.color,color:"#fff",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99}},s.label),
+        !geo && issue.wcag && e("span",{style:{fontSize:11,color:"#64748b",background:"#e2e8f0",padding:"2px 6px",borderRadius:99}},issue.wcag),
+        e("span",{style:{color:"#94a3b8"}},open?"▲":"▼")
+      )
+    ),
+    open && e("div",{style:{padding:"0 13px 11px",borderTop:`1px solid ${s.color}20`}},
+      e("p",{style:{fontSize:13,color:"#374151",margin:"8px 0 6px",lineHeight:1.6}},issue.description),
+      issue.element && e("code",{style:{display:"block",background:"#1e293b",color:"#7dd3fc",padding:"6px 10px",borderRadius:6,fontSize:11,margin:"5px 0",wordBreak:"break-all"}},issue.element),
+      e("div",{style:{background:"#dbeafe",borderRadius:6,padding:"7px 10px",borderLeft:"3px solid #3b82f6",marginTop:6}},
+        e("p",{style:{fontSize:12,color:"#1e3a5f",margin:0}},e("strong",null,"Solución: "),issue.fix)
+      )
+    )
   );
 }
 
 function HeatMap({ data }) {
-  return (
-    <div style={{background:"#0f172a", borderRadius:10, padding:14}}>
-      <p style={{color:"#64748b", fontSize:11, margin:"0 0 10px"}}>Zonas de mayor carga cognitiva y atención visual estimada</p>
-      <div style={{display:"grid", gridTemplateColumns:"repeat(20, 1fr)", gap:2}}>
-        {data.map((v, i) => {
-          const t = v/100;
-          return <div key={i} style={{height:16, borderRadius:2, background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}}/>;
-        })}
-      </div>
-      <div style={{display:"flex", gap:16, marginTop:10, fontSize:11, color:"#64748b"}}>
-        {[["#ef4444","Alta"],["#f59e0b","Media"],["#22c55e","Baja"]].map(([c,l]) => (
-          <span key={l} style={{display:"flex", alignItems:"center", gap:4}}>
-            <span style={{width:10, height:10, borderRadius:2, background:c, display:"inline-block"}}/>{l}
-          </span>
-        ))}
-      </div>
-    </div>
+  return e("div",{style:{background:"#0f172a",borderRadius:10,padding:14}},
+    e("p",{style:{color:"#64748b",fontSize:11,margin:"0 0 10px"}},"Zonas de mayor carga cognitiva y atención visual estimada"),
+    e("div",{style:{display:"grid",gridTemplateColumns:"repeat(20, 1fr)",gap:2}},
+      data.map((v,i)=>{const t=v/100; return e("div",{key:i,style:{height:16,borderRadius:2,background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}});})
+    ),
+    e("div",{style:{display:"flex",gap:16,marginTop:10,fontSize:11,color:"#64748b"}},
+      [["#ef4444","Alta"],["#f59e0b","Media"],["#22c55e","Baja"]].map(([c,l])=>
+        e("span",{key:l,style:{display:"flex",alignItems:"center",gap:4}},
+          e("span",{style:{width:10,height:10,borderRadius:2,background:c,display:"inline-block"}}),l
+        )
+      )
+    )
   );
 }
 
-export default function App() {
-  const [url, setUrl]          = useState("");
-  const [loading, setLoading]  = useState(false);
-  const [loadingMode, setLoadingMode] = useState("");
-  const [phase, setPhase]      = useState(0);
-  const [phase1, setPhase1]    = useState(null);
-  const [result, setResult]    = useState(null);
-  const [tab, setTab]          = useState("a11y");
-  const [filterSev, setFilter] = useState("all");
-  const [showPDF, setShowPDF]  = useState(false);
+function App() {
+  const [url,setUrl]             = useState("");
+  const [loading,setLoading]     = useState(false);
+  const [loadingMode,setLMode]   = useState("");
+  const [phase,setPhase]         = useState(0);
+  const [phase1,setPhase1]       = useState(null);
+  const [result,setResult]       = useState(null);
+  const [tab,setTab]             = useState("a11y");
+  const [filterSev,setFilter]    = useState("all");
+  const [showPDF,setShowPDF]     = useState(false);
 
   async function audit(mode) {
     if (!url.trim()) return;
-    setResult(null); setPhase1(null); setLoading(true); setLoadingMode(mode); setTab("a11y"); setFilter("all"); setPhase(0);
-
+    setResult(null); setPhase1(null); setLoading(true); setLMode(mode); setTab("a11y"); setFilter("all"); setPhase(0);
     const input = url.trim();
-    let siteName = "Sitio web";
-    try { siteName = new URL(input.startsWith("http")?input:"https://"+input).hostname.replace("www.",""); } catch {}
+    let siteName="Sitio web";
+    try { siteName=new URL(input.startsWith("http")?input:"https://"+input).hostname.replace("www.",""); } catch {}
 
-    // FASE 1 — rápida siempre
     setPhase(1);
-    await new Promise(r => setTimeout(r, 900));
+    await new Promise(r=>setTimeout(r,900));
 
-    const issues = shuffle(ISSUES).slice(0, 6 + Math.floor(Math.random()*3)).map((x,i) => ({...x, id:`a${i}`}));
+    const issues = shuffle(ISSUES).slice(0,6+Math.floor(Math.random()*3)).map((x,i)=>({...x,id:`a${i}`}));
     const stats = {critical:0,serious:0,moderate:0,minor:0};
-    issues.forEach(i => stats[i.severity]++);
+    issues.forEach(i=>stats[i.severity]++);
     const score = calcScore(issues);
-    const passedChecks = 18 + Math.floor(Math.random()*8);
-    const totalChecks = passedChecks + issues.length;
-
-    const p1 = { siteName, url: input, score, stats, issues, passedChecks, totalChecks,
+    const passedChecks = 18+Math.floor(Math.random()*8);
+    const totalChecks = passedChecks+issues.length;
+    const p1 = { siteName, url:input, score, stats, issues, passedChecks, totalChecks,
       summary:`${stats.critical} issue${stats.critical!==1?"s":""} crítico${stats.critical!==1?"s":""} detectado${stats.critical!==1?"s":""}. Cumplimiento estimado al ${Math.round(passedChecks/totalChecks*100)}%.`,
       scoreBreakdown:{
-        perceptible: Math.max(20, score + Math.floor(Math.random()*10)-5),
-        operable:    Math.max(20, score - 5 + Math.floor(Math.random()*12)),
-        comprensible:Math.max(20, score + 5 + Math.floor(Math.random()*8)),
-        robusto:     Math.max(20, score - 8 + Math.floor(Math.random()*15)),
+        perceptible:Math.max(20,score+Math.floor(Math.random()*10)-5),
+        operable:Math.max(20,score-5+Math.floor(Math.random()*12)),
+        comprensible:Math.max(20,score+5+Math.floor(Math.random()*8)),
+        robusto:Math.max(20,score-8+Math.floor(Math.random()*15)),
       }
     };
 
-    // Si es análisis rápido → mostrar solo fase 1 y parar
-    if (mode === "quick") {
-      setResult({ ...p1, geoScore:null, geoIssues:[], heatZones:[], geoSummary:"", priorityActions:[] });
+    if (mode==="quick") {
+      setResult({...p1,geoScore:null,geoIssues:[],heatZones:[],geoSummary:"",priorityActions:[]});
       setPhase(3); setLoading(false); return;
     }
 
-    // FASE 2 — solo en auditoría completa
-    setPhase1(p1);
-    setPhase(2);
-    await new Promise(r => setTimeout(r, 1000));
+    setPhase1(p1); setPhase(2);
+    await new Promise(r=>setTimeout(r,1000));
 
-    const geoIssues = shuffle(GEO_ISSUES).slice(0, 4+Math.floor(Math.random()*2)).map((x,i)=>({...x,id:`g${i}`}));
-    const geoScore = Math.max(20, Math.min(90, 85 - geoIssues.filter(i=>i.severity==="critical").length*14 - geoIssues.filter(i=>i.severity==="serious").length*7));
+    const geoIssues = shuffle(GEO_ISSUES).slice(0,4+Math.floor(Math.random()*2)).map((x,i)=>({...x,id:`g${i}`}));
+    const geoScore = Math.max(20,Math.min(90,85-geoIssues.filter(i=>i.severity==="critical").length*14-geoIssues.filter(i=>i.severity==="serious").length*7));
     const heatZones = Array.from({length:40},(_,i)=>Math.round(Math.max(5,90-i*2+(Math.random()-0.5)*20)));
 
     setResult({
       ...p1, geoScore, geoIssues, heatZones,
       geoSummary:`${geoIssues.filter(i=>i.severity==="critical").length} problema${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} crítico${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} afectan tu visibilidad en ChatGPT, Perplexity y Claude.`,
       priorityActions:[
-        issues.filter(i=>i.severity==="critical")[0]?.title ? `Corregir issues críticos: ${issues.filter(i=>i.severity==="critical").map(i=>i.title).slice(0,2).join(" y ")}` : "Revisar issues graves de accesibilidad",
-        geoIssues.filter(i=>i.severity==="critical")[0]?.title ? `Prioridad GEO: ${geoIssues.filter(i=>i.severity==="critical")[0].title}` : "Mejorar señales de autoridad y E-E-A-T",
+        issues.filter(i=>i.severity==="critical")[0]?.title?`Corregir issues críticos: ${issues.filter(i=>i.severity==="critical").map(i=>i.title).slice(0,2).join(" y ")}`:"Revisar issues graves de accesibilidad",
+        geoIssues.filter(i=>i.severity==="critical")[0]?.title?`Prioridad GEO: ${geoIssues.filter(i=>i.severity==="critical")[0].title}`:"Mejorar señales de autoridad y E-E-A-T",
         "Añadir datos estructurados Schema.org y formato pregunta-respuesta al contenido"
       ]
     });
     setPhase(3); setLoading(false);
   }
 
-  const tabBtn = (id, label) => (
-    <button onClick={() => setTab(id)} style={{padding:"7px 14px", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
-      background:tab===id?"#6366f1":"transparent", color:tab===id?"#fff":"#64748b"}}>{label}</button>
-  );
+  const tabBtn = (id,label) => e("button",{onClick:()=>setTab(id),style:{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:tab===id?"#6366f1":"transparent",color:tab===id?"#fff":"#64748b"}},label);
+  const filtered = result?.issues?.filter(i=>filterSev==="all"||i.severity===filterSev)||[];
 
-  const filtered = result?.issues?.filter(i => filterSev==="all"||i.severity===filterSev)||[];
+  return e("div",{style:{minHeight:"100vh",padding:"20px 14px"}},
+    e("div",{style:{maxWidth:860,margin:"0 auto"}},
 
-  return (
-    <div style={{minHeight:"100vh", background:"linear-gradient(135deg,#0f172a,#1e1b4b)", padding:"20px 14px", fontFamily:"system-ui,sans-serif"}}>
-      <div style={{maxWidth:860, margin:"0 auto"}}>
+      e("div",{style:{textAlign:"center",marginBottom:22}},
+        e("div",{style:{fontSize:34,marginBottom:4}},"♿"),
+        e("h1",{style:{color:"#f8fafc",fontSize:24,fontWeight:800,margin:0}},"Accessibility + GEO Auditor"),
+        e("p",{style:{color:"#94a3b8",fontSize:12,marginTop:4}},"WCAG 2.1 AA · GEO · 2 fases · Informe PDF")
+      ),
 
-        {/* Header */}
-        <div style={{textAlign:"center", marginBottom:22}}>
-          <div style={{fontSize:34, marginBottom:4}}>♿</div>
-          <h1 style={{color:"#f8fafc", fontSize:24, fontWeight:800, margin:0}}>Accessibility + GEO Auditor</h1>
-          <p style={{color:"#94a3b8", fontSize:12, marginTop:4}}>WCAG 2.1 AA · GEO · Informe PDF</p>
-        </div>
+      e("div",{style:{background:"#1e293b",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #334155"}},
+        e("input",{value:url,onChange:ev=>setUrl(ev.target.value),onKeyDown:ev=>ev.key==="Enter"&&!loading&&audit("full"),
+          placeholder:"https://ejemplo.com",
+          style:{width:"100%",padding:"11px 14px",borderRadius:9,border:"1px solid #475569",background:"#0f172a",color:"#f1f5f9",fontSize:14,outline:"none",marginBottom:10}}),
+        e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},
+          e("button",{onClick:()=>audit("quick"),disabled:loading||!url.trim(),
+            style:{padding:"14px 12px",borderRadius:10,background:"#0f172a",color:loading&&loadingMode==="quick"?"#64748b":"#a5b4fc",
+              border:"1px solid #6366f1",cursor:loading?"default":"pointer",fontWeight:700,fontSize:13,textAlign:"center",opacity:loading&&loadingMode==="full"?0.5:1}},
+            e("div",{style:{fontSize:18,marginBottom:4}},"⚡"),
+            e("div",null,"Análisis rápido"),
+            e("div",{style:{fontSize:11,fontWeight:400,color:"#64748b",marginTop:3}},"Score + issues en ~5s")
+          ),
+          e("button",{onClick:()=>audit("full"),disabled:loading||!url.trim(),
+            style:{padding:"14px 12px",borderRadius:10,background:loading&&loadingMode==="full"?"#4338ca":"#6366f1",color:"#fff",
+              border:"none",cursor:loading?"default":"pointer",fontWeight:700,fontSize:13,textAlign:"center",opacity:loading&&loadingMode==="quick"?0.5:1}},
+            e("div",{style:{fontSize:18,marginBottom:4}},"🔬"),
+            e("div",null,"Auditoría completa"),
+            e("div",{style:{fontSize:11,fontWeight:400,opacity:0.75,marginTop:3}},"+GEO + Heat Map + PDF")
+          )
+        )
+      ),
 
-        {/* Input + 2 botones */}
-        <div style={{background:"#1e293b", borderRadius:14, padding:16, marginBottom:14, border:"1px solid #334155"}}>
-          <input value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&audit("full")}
-            placeholder="https://ejemplo.com"
-            style={{width:"100%", padding:"11px 14px", borderRadius:9, border:"1px solid #475569", background:"#0f172a", color:"#f1f5f9", fontSize:14, outline:"none", marginBottom:10}}/>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+      loading && e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #334155"}},
+        e("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}},
+          [["⚡","Análisis rápido",1],["🔬","Detalle completo",2],["✓","Completado",3]].map(([icon,label,idx])=>{
+            const done=phase>idx, active=phase===idx, skip=loadingMode==="quick"&&idx===2;
+            if (skip) return null;
+            return e("div",{key:idx,style:{display:"flex",alignItems:"center",gap:6}},
+              e("div",{style:{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:99,fontSize:12,fontWeight:700,
+                background:done?"#052e16":active?"#1e1b4b":"#0f172a",
+                border:`1px solid ${done?"#22c55e":active?"#6366f1":"#334155"}`,
+                color:done?"#22c55e":active?"#a5b4fc":"#475569"}},
+                e("span",null,done?"✓":icon),
+                e("span",null,label),
+                active && e("span",{style:{width:7,height:7,borderRadius:"50%",background:"#6366f1",display:"inline-block",animation:"pulse 1.2s ease-in-out infinite"}})
+              ),
+              idx<(loadingMode==="quick"?1:2) && e("span",{style:{color:"#334155"}},"→")
+            );
+          })
+        ),
+        e("p",{style:{color:"#94a3b8",fontSize:12,margin:0}},
+          phase===1?"⚡ Calculando score, métricas y issues...":"🔬 Generando análisis GEO, heat map y plan de acción...")
+      ),
 
-            {/* Botón análisis rápido */}
-            <button onClick={()=>audit("quick")} disabled={loading||!url.trim()}
-              style={{padding:"14px 12px", borderRadius:10, background:"#0f172a", color: loading&&loadingMode==="quick"?"#64748b":"#a5b4fc",
-                border:"1px solid #6366f1", cursor:loading?"default":"pointer", fontWeight:700, fontSize:13, textAlign:"center", opacity:loading&&loadingMode==="full"?0.5:1}}>
-              <div style={{fontSize:18, marginBottom:4}}>⚡</div>
-              <div>Análisis rápido</div>
-              <div style={{fontSize:11, fontWeight:400, color:"#64748b", marginTop:3}}>Score + issues en ~5s</div>
-            </button>
+      phase===2 && phase1 && e("div",{style:{background:"#1e293b",borderRadius:14,padding:20,marginBottom:12,border:"1px solid #334155",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",opacity:0.92}},
+        e(ScoreRing,{score:phase1.score}),
+        e("div",{style:{flex:1,minWidth:180}},
+          e("div",{style:{display:"flex",gap:6,alignItems:"center",marginBottom:4}},
+            e("h2",{style:{color:"#f1f5f9",margin:0,fontSize:17}},phase1.siteName),
+            e("span",{style:{background:"#312e81",color:"#a5b4fc",fontSize:10,padding:"2px 8px",borderRadius:99,fontWeight:700}},"CARGANDO GEO...")
+          ),
+          e("p",{style:{color:"#cbd5e1",fontSize:12,margin:"0 0 10px",lineHeight:1.6}},phase1.summary),
+          e("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+            Object.entries(SEV).map(([k,s])=>e("span",{key:k,style:{background:`${s.color}20`,color:s.color,fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99,border:`1px solid ${s.color}40`}},`${phase1.stats[k]||0} ${s.label}`))
+          )
+        )
+      ),
 
-            {/* Botón auditoría completa */}
-            <button onClick={()=>audit("full")} disabled={loading||!url.trim()}
-              style={{padding:"14px 12px", borderRadius:10, background: loading&&loadingMode==="full"?"#4338ca":"#6366f1", color:"#fff",
-                border:"none", cursor:loading?"default":"pointer", fontWeight:700, fontSize:13, textAlign:"center", opacity:loading&&loadingMode==="quick"?0.5:1}}>
-              <div style={{fontSize:18, marginBottom:4}}>🔬</div>
-              <div>Auditoría completa</div>
-              <div style={{fontSize:11, fontWeight:400, opacity:0.75, marginTop:3}}>+ GEO + Heat Map + PDF</div>
-            </button>
-          </div>
-        </div>
+      result && phase===3 && e("div",null,
 
-        {/* Loading */}
-        {loading && (
-          <div style={{background:"#1e293b", borderRadius:12, padding:16, marginBottom:14, border:"1px solid #334155"}}>
-            <div style={{display:"flex", gap:8, alignItems:"center", marginBottom:10, flexWrap:"wrap"}}>
-              {[["⚡","Análisis rápido",1],["🔬","Detalle completo",2],["✓","Completado",3]].map(([icon,label,idx]) => {
-                const done = phase > idx, active = phase === idx, skip = loadingMode==="quick" && idx===2;
-                if (skip) return null;
-                return (
-                  <div key={idx} style={{display:"flex", alignItems:"center", gap:6}}>
-                    <div style={{display:"flex", alignItems:"center", gap:5, padding:"5px 11px", borderRadius:99, fontSize:12, fontWeight:700,
-                      background:done?"#052e16":active?"#1e1b4b":"#0f172a",
-                      border:`1px solid ${done?"#22c55e":active?"#6366f1":"#334155"}`,
-                      color:done?"#22c55e":active?"#a5b4fc":"#475569"}}>
-                      <span>{done?"✓":icon}</span>
-                      <span>{label}</span>
-                      {active && <span style={{width:7, height:7, borderRadius:"50%", background:"#6366f1", display:"inline-block", animation:"pulse 1.2s ease-in-out infinite"}}/>}
-                    </div>
-                    {idx < (loadingMode==="quick"?1:2) && <span style={{color:"#334155"}}>→</span>}
-                  </div>
-                );
-              })}
-            </div>
-            <p style={{color:"#94a3b8", fontSize:12, margin:0}}>
-              {phase===1 ? "⚡ Calculando score, métricas y issues..." : "🔬 Generando análisis GEO, heat map y plan de acción..."}
-            </p>
-          </div>
-        )}
+        e("div",{style:{display:"grid",gridTemplateColumns:result.geoScore?"1fr 1fr":"1fr",gap:10,marginBottom:12}},
+          e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,border:"1px solid #334155",display:"flex",gap:14,alignItems:"center"}},
+            e(ScoreRing,{score:result.score}),
+            e("div",null,
+              e("div",{style:{color:"#f1f5f9",fontWeight:700,fontSize:15}},result.siteName),
+              e("div",{style:{color:"#64748b",fontSize:11,marginBottom:6}},"Accesibilidad WCAG 2.1 AA"),
+              e("p",{style:{color:"#94a3b8",fontSize:11,margin:"0 0 6px",lineHeight:1.5}},result.summary),
+              e("div",{style:{display:"flex",gap:5,flexWrap:"wrap"}},
+                Object.entries(SEV).map(([k,s])=>e("span",{key:k,style:{background:`${s.color}20`,color:s.color,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,border:`1px solid ${s.color}40`}},`${result.stats[k]||0} ${s.label}`))
+              ),
+              !result.geoScore && e("button",{onClick:()=>audit("full"),style:{marginTop:10,padding:"6px 14px",borderRadius:8,background:"#6366f1",color:"#fff",border:"none",cursor:"pointer",fontSize:12,fontWeight:700}},"🔬 Ver auditoría completa + GEO")
+            )
+          ),
+          result.geoScore && e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,border:"1px solid #6366f130",display:"flex",gap:14,alignItems:"center"}},
+            e(ScoreRing,{score:result.geoScore,label:"GEO · IA"}),
+            e("div",null,
+              e("div",{style:{color:"#f1f5f9",fontWeight:700,fontSize:15}},"Visibilidad en IAs"),
+              e("div",{style:{color:"#a5b4fc",fontSize:11,marginBottom:6}},"ChatGPT · Perplexity · Claude"),
+              e("p",{style:{color:"#94a3b8",fontSize:11,margin:0,lineHeight:1.5}},result.geoSummary)
+            )
+          )
+        ),
 
-        {/* Preview fase 1 mientras carga fase 2 */}
-        {phase===2 && phase1 && (
-          <div style={{background:"#1e293b", borderRadius:14, padding:20, marginBottom:12, border:"1px solid #334155", display:"flex", gap:20, alignItems:"center", flexWrap:"wrap", opacity:0.92}}>
-            <ScoreRing score={phase1.score}/>
-            <div style={{flex:1, minWidth:180}}>
-              <div style={{display:"flex", gap:6, alignItems:"center", marginBottom:4}}>
-                <h2 style={{color:"#f1f5f9", margin:0, fontSize:17}}>{phase1.siteName}</h2>
-                <span style={{background:"#312e81", color:"#a5b4fc", fontSize:10, padding:"2px 8px", borderRadius:99, fontWeight:700}}>CARGANDO GEO...</span>
-              </div>
-              <p style={{color:"#cbd5e1", fontSize:12, margin:"0 0 10px", lineHeight:1.6}}>{phase1.summary}</p>
-              <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
-                {Object.entries(SEV).map(([k,s]) => (
-                  <span key={k} style={{background:`${s.color}20`, color:s.color, fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:99, border:`1px solid ${s.color}40`}}>
-                    {phase1.stats[k]||0} {s.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        result.geoScore && e("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}},
+          Object.entries(result.scoreBreakdown||{}).map(([k,v])=>{
+            const col=v>=80?"#22c55e":v>=60?"#eab308":"#ef4444";
+            return e("div",{key:k,style:{background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"12px 10px",textAlign:"center"}},
+              e("div",{style:{fontSize:19,fontWeight:800,color:col}},v),
+              e("div",{style:{fontSize:10,color:"#94a3b8",marginTop:2,textTransform:"capitalize"}},k),
+              e("div",{style:{marginTop:5,height:3,background:"#334155",borderRadius:99}},
+                e("div",{style:{width:`${v}%`,height:"100%",background:col,borderRadius:99,transition:"width 1s ease"}})
+              )
+            );
+          })
+        ),
 
-        {/* Resultado completo */}
-        {result && phase===3 && (
-          <>
-            {/* Score cards */}
-            <div style={{display:"grid", gridTemplateColumns: result.geoScore ? "1fr 1fr" : "1fr", gap:10, marginBottom:12}}>
-              <div style={{background:"#1e293b", borderRadius:12, padding:16, border:"1px solid #334155", display:"flex", gap:14, alignItems:"center"}}>
-                <ScoreRing score={result.score}/>
-                <div>
-                  <div style={{color:"#f1f5f9", fontWeight:700, fontSize:15}}>{result.siteName}</div>
-                  <div style={{color:"#64748b", fontSize:11, marginBottom:6}}>Accesibilidad WCAG 2.1 AA</div>
-                  <p style={{color:"#94a3b8", fontSize:11, margin:"0 0 6px", lineHeight:1.5}}>{result.summary}</p>
-                  <div style={{display:"flex", gap:5, flexWrap:"wrap"}}>
-                    {Object.entries(SEV).map(([k,s]) => (
-                      <span key={k} style={{background:`${s.color}20`, color:s.color, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:99, border:`1px solid ${s.color}40`}}>
-                        {result.stats[k]||0} {s.label}
-                      </span>
-                    ))}
-                  </div>
-                  {!result.geoScore && (
-                    <button onClick={()=>audit("full")}
-                      style={{marginTop:10, padding:"6px 14px", borderRadius:8, background:"#6366f1", color:"#fff", border:"none", cursor:"pointer", fontSize:12, fontWeight:700}}>
-                      🔬 Ver auditoría completa + GEO
-                    </button>
-                  )}
-                </div>
-              </div>
-              {result.geoScore && (
-                <div style={{background:"#1e293b", borderRadius:12, padding:16, border:"1px solid #6366f130", display:"flex", gap:14, alignItems:"center"}}>
-                  <ScoreRing score={result.geoScore} label="GEO · IA"/>
-                  <div>
-                    <div style={{color:"#f1f5f9", fontWeight:700, fontSize:15}}>Visibilidad en IAs</div>
-                    <div style={{color:"#a5b4fc", fontSize:11, marginBottom:6}}>ChatGPT · Perplexity · Claude</div>
-                    <p style={{color:"#94a3b8", fontSize:11, margin:"0 0 8px", lineHeight:1.5}}>{result.geoSummary}</p>
+        e("div",{style:{background:"#1e293b",borderRadius:10,padding:4,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,border:"1px solid #334155"}},
+          e("div",{style:{display:"flex",gap:3,flexWrap:"wrap"}},
+            tabBtn("a11y","♿ Accesibilidad"),
+            result.geoScore && tabBtn("geo","🤖 GEO · IA"),
+            result.geoScore && tabBtn("heatmap","🔥 Heat Map"),
+            result.geoScore && tabBtn("actions","✅ Acciones")
+          ),
+          result.geoScore && e("button",{onClick:()=>setShowPDF(true),
+            style:{padding:"6px 14px",borderRadius:8,background:"#312e81",color:"#c7d2fe",border:"1px solid #4338ca",cursor:"pointer",fontSize:12,fontWeight:700,whiteSpace:"nowrap",marginRight:4}},
+            "📄 Descargar informe PDF")
+        ),
 
-                  </div>
-                </div>
-              )}
-            </div>
+        tab==="a11y" && e("div",{style:{background:"#1e293b",borderRadius:14,padding:18,border:"1px solid #334155"}},
+          e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}},
+            e("h3",{style:{color:"#f1f5f9",margin:0,fontSize:15}},`Issues detectados (${filtered.length})`),
+            e("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},
+              ["all","critical","serious","moderate","minor"].map(f=>e("button",{key:f,onClick:()=>setFilter(f),
+                style:{padding:"3px 10px",borderRadius:99,fontSize:11,fontWeight:700,border:"none",cursor:"pointer",
+                  background:filterSev===f?(f==="all"?"#6366f1":SEV[f]?.color||"#6366f1"):"#0f172a",
+                  color:filterSev===f?"#fff":"#94a3b8"}},
+                f==="all"?"Todos":SEV[f].label))
+            )
+          ),
+          filtered.map(i=>e(IssueCard,{key:i.id,issue:i}))
+        ),
 
-            {/* WCAG breakdown — solo en completa */}
-            {result.geoScore && (
-              <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:12}}>
-                {Object.entries(result.scoreBreakdown||{}).map(([k,v]) => {
-                  const col = v>=80?"#22c55e":v>=60?"#eab308":"#ef4444";
-                  return (
-                    <div key={k} style={{background:"#1e293b", border:"1px solid #334155", borderRadius:10, padding:"12px 10px", textAlign:"center"}}>
-                      <div style={{fontSize:19, fontWeight:800, color:col}}>{v}</div>
-                      <div style={{fontSize:10, color:"#94a3b8", marginTop:2, textTransform:"capitalize"}}>{k}</div>
-                      <div style={{marginTop:5, height:3, background:"#334155", borderRadius:99}}>
-                        <div style={{width:`${v}%`, height:"100%", background:col, borderRadius:99, transition:"width 1s ease"}}/>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        tab==="geo" && result.geoScore && e("div",{style:{background:"#1e293b",borderRadius:14,padding:18,border:"1px solid #334155"}},
+          e("p",{style:{color:"#94a3b8",fontSize:12,margin:"0 0 14px"}},"Problemas que reducen tu visibilidad en motores generativos de IA"),
+          result.geoIssues.map(i=>e(IssueCard,{key:i.id,issue:i,geo:true})),
+          e("div",{style:{marginTop:16,background:"#0f172a",borderRadius:10,padding:14,border:"1px solid #6366f130"}},
+            e("p",{style:{color:"#a5b4fc",fontWeight:700,fontSize:13,margin:"0 0 10px"}},"💡 Quick wins para aparecer en IAs"),
+            ["Publica datos o estudios originales — las IAs citan estadísticas únicas",
+             "Usa formato pregunta-respuesta: '¿Qué es X?', '¿Cómo funciona Y?'",
+             "Consigue menciones en medios del sector — las IAs aprenden de fuentes de autoridad"
+            ].map((tip,i)=>e("div",{key:i,style:{display:"flex",gap:8,padding:"5px 0",borderTop:i>0?"1px solid #1e293b":"none"}},
+              e("span",{style:{color:"#6366f1"}},"→"),
+              e("p",{style:{color:"#cbd5e1",fontSize:12,margin:0,lineHeight:1.6}},tip)
+            ))
+          )
+        ),
 
-            {/* Tabs + botón PDF a la derecha */}
-            <div style={{background:"#1e293b", borderRadius:10, padding:4, display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, border:"1px solid #334155"}}>
-              <div style={{display:"flex", gap:3, flexWrap:"wrap"}}>
-                {tabBtn("a11y","♿ Accesibilidad")}
-                {result.geoScore && tabBtn("geo","🤖 GEO · IA")}
-                {result.geoScore && tabBtn("heatmap","🔥 Heat Map")}
-                {result.geoScore && tabBtn("actions","✅ Acciones")}
-              </div>
-              {result.geoScore && (
-                <button onClick={()=>setShowPDF(true)}
-                  style={{padding:"6px 14px", borderRadius:8, background:"#312e81", color:"#c7d2fe",
-                    border:"1px solid #4338ca", cursor:"pointer", fontSize:12, fontWeight:700, whiteSpace:"nowrap", marginRight:4}}>
-                  📄 Descargar informe PDF
-                </button>
-              )}
-            </div>
+        tab==="heatmap" && result.geoScore && e("div",{style:{background:"#1e293b",borderRadius:14,padding:18,border:"1px solid #334155"}},
+          e("h3",{style:{color:"#f1f5f9",marginTop:0,fontSize:15}},"🔥 Heat Insights — Mapa de atención"),
+          e("p",{style:{color:"#94a3b8",fontSize:12,marginBottom:14}},"Estimación de zonas con mayor carga cognitiva y atención visual."),
+          e(HeatMap,{data:result.heatZones}),
+          e("div",{style:{marginTop:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+            [["🔴 Máxima atención","Header y nav. Mayor impacto en experiencia.","#f87171"],
+             ["🟡 Contenido principal","Jerarquías y contraste críticos aquí.","#fbbf24"],
+             ["🟢 Zona media-baja","CTAs y formularios. Verificar foco.","#4ade80"],
+             ["⚫ Footer","Menor atención pero cumplimiento total.","#94a3b8"]
+            ].map(([t,d,c])=>e("div",{key:t,style:{background:"#0f172a",borderRadius:9,padding:12}},
+              e("p",{style:{color:c,fontSize:12,fontWeight:700,margin:"0 0 4px"}},t),
+              e("p",{style:{color:"#94a3b8",fontSize:11,margin:0,lineHeight:1.5}},d)
+            ))
+          )
+        ),
 
-            {/* Tab accesibilidad */}
-            {tab==="a11y" && (
-              <div style={{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"}}>
-                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8}}>
-                  <h3 style={{color:"#f1f5f9", margin:0, fontSize:15}}>Issues detectados ({filtered.length})</h3>
-                  <div style={{display:"flex", gap:4, flexWrap:"wrap"}}>
-                    {["all","critical","serious","moderate","minor"].map(f => (
-                      <button key={f} onClick={()=>setFilter(f)}
-                        style={{padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, border:"none", cursor:"pointer",
-                          background:filterSev===f?(f==="all"?"#6366f1":SEV[f]?.color||"#6366f1"):"#0f172a",
-                          color:filterSev===f?"#fff":"#94a3b8"}}>
-                        {f==="all"?"Todos":SEV[f].label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {filtered.map(i => <IssueCard key={i.id} issue={i}/>)}
-              </div>
-            )}
+        tab==="actions" && result.geoScore && e("div",{style:{background:"#1e293b",borderRadius:14,padding:18,border:"1px solid #334155"}},
+          e("h3",{style:{color:"#f1f5f9",fontSize:15,marginTop:0}},"✅ Plan de acción prioritario"),
+          result.priorityActions.map((action,i)=>e("div",{key:i,style:{display:"flex",gap:12,padding:14,background:"#0f172a",borderRadius:9,marginBottom:8,border:"1px solid #334155",alignItems:"flex-start"}},
+            e("div",{style:{minWidth:30,height:30,borderRadius:"50%",background:["#ef4444","#f97316","#eab308"][i]||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:13,flexShrink:0}},i+1),
+            e("p",{style:{color:"#e2e8f0",fontSize:13,margin:0,lineHeight:1.6}},action)
+          ))
+        ),
 
-            {/* Tab GEO */}
-            {tab==="geo" && result.geoScore && (
-              <div style={{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"}}>
-                <p style={{color:"#94a3b8", fontSize:12, margin:"0 0 14px"}}>Problemas que reducen tu visibilidad en motores generativos de IA</p>
-                {result.geoIssues.map(i => <IssueCard key={i.id} issue={i} geo/>)}
-                <div style={{marginTop:16, background:"#0f172a", borderRadius:10, padding:14, border:"1px solid #6366f130"}}>
-                  <p style={{color:"#a5b4fc", fontWeight:700, fontSize:13, margin:"0 0 10px"}}>💡 Quick wins para aparecer en IAs</p>
-                  {["Publica datos o estudios originales — las IAs citan estadísticas únicas",
-                    "Usa formato pregunta-respuesta: '¿Qué es X?', '¿Cómo funciona Y?'",
-                    "Consigue menciones en medios del sector — las IAs aprenden de fuentes de autoridad"
-                  ].map((tip,i) => (
-                    <div key={i} style={{display:"flex", gap:8, padding:"5px 0", borderTop:i>0?"1px solid #1e293b":"none"}}>
-                      <span style={{color:"#6366f1"}}>→</span>
-                      <p style={{color:"#cbd5e1", fontSize:12, margin:0, lineHeight:1.6}}>{tip}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        showPDF && e("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",flexDirection:"column"}},
+          e("div",{style:{background:"#1e293b",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #334155",flexShrink:0}},
+            e("div",null,
+              e("span",{style:{color:"#f1f5f9",fontWeight:700,fontSize:14}},`📄 Informe completo — ${result.siteName}`),
+              e("span",{style:{color:"#64748b",fontSize:11,marginLeft:12}},"Ctrl+P para guardar como PDF")
+            ),
+            e("button",{onClick:()=>setShowPDF(false),style:{background:"#ef4444",color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",cursor:"pointer",fontWeight:700,fontSize:13}},"✕ Cerrar")
+          ),
+          e("div",{style:{flex:1,overflow:"auto",background:"#f8fafc"}},
+            e("div",{style:{maxWidth:780,margin:"0 auto",padding:"32px 24px",background:"#fff",minHeight:"100%"}},
 
-            {/* Tab Heat Map */}
-            {tab==="heatmap" && result.geoScore && (
-              <div style={{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"}}>
-                <h3 style={{color:"#f1f5f9", marginTop:0, fontSize:15}}>🔥 Heat Insights — Mapa de atención</h3>
-                <p style={{color:"#94a3b8", fontSize:12, marginBottom:14}}>Estimación de zonas con mayor carga cognitiva y atención visual.</p>
-                <HeatMap data={result.heatZones}/>
-                <div style={{marginTop:14, display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-                  {[["🔴 Máxima atención","Header y nav. Mayor impacto en experiencia.","#f87171"],
-                    ["🟡 Contenido principal","Jerarquías y contraste críticos aquí.","#fbbf24"],
-                    ["🟢 Zona media-baja","CTAs y formularios. Verificar foco.","#4ade80"],
-                    ["⚫ Footer","Menor atención pero cumplimiento total.","#94a3b8"]
-                  ].map(([t,d,c]) => (
-                    <div key={t} style={{background:"#0f172a", borderRadius:9, padding:12}}>
-                      <p style={{color:c, fontSize:12, fontWeight:700, margin:"0 0 4px"}}>{t}</p>
-                      <p style={{color:"#94a3b8", fontSize:11, margin:0, lineHeight:1.5}}>{d}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              e("div",{style:{borderBottom:"3px solid #6366f1",paddingBottom:18,marginBottom:24}},
+                e("div",{style:{fontSize:10,color:"#6366f1",fontWeight:"bold",letterSpacing:1,marginBottom:3}},"INFORME DE ACCESIBILIDAD + GEO — WCAG 2.1 AA"),
+                e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}},
+                  e("div",null,
+                    e("h1",{style:{fontSize:22,color:"#0f172a",margin:"0 0 4px"}},result.siteName),
+                    e("p",{style:{fontSize:12,color:"#64748b",margin:0}},result.url),
+                    e("p",{style:{fontSize:11,color:"#94a3b8",margin:"2px 0 0"}},new Date().toLocaleDateString("es-ES",{year:"numeric",month:"long",day:"numeric"}))
+                  ),
+                  e("div",{style:{display:"flex",gap:10}},
+                    e("div",{style:{textAlign:"center",padding:"12px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}},
+                      e("div",{style:{fontSize:32,fontWeight:"bold",color:result.score>=80?"#16a34a":result.score>=60?"#ca8a04":"#dc2626"}},result.score),
+                      e("div",{style:{fontSize:10,color:"#64748b"}},"Accesibilidad")
+                    ),
+                    result.geoScore && e("div",{style:{textAlign:"center",padding:"12px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}},
+                      e("div",{style:{fontSize:32,fontWeight:"bold",color:"#6366f1"}},result.geoScore),
+                      e("div",{style:{fontSize:10,color:"#64748b"}},"GEO · IA")
+                    )
+                  )
+                )
+              ),
 
-            {/* Tab Acciones */}
-            {tab==="actions" && result.geoScore && (
-              <div style={{background:"#1e293b", borderRadius:14, padding:18, border:"1px solid #334155"}}>
-                <h3 style={{color:"#f1f5f9", fontSize:15, marginTop:0}}>✅ Plan de acción prioritario</h3>
-                {result.priorityActions.map((action,i) => (
-                  <div key={i} style={{display:"flex", gap:12, padding:14, background:"#0f172a", borderRadius:9, marginBottom:8, border:"1px solid #334155", alignItems:"flex-start"}}>
-                    <div style={{minWidth:30, height:30, borderRadius:"50%", background:["#ef4444","#f97316","#eab308"][i]||"#6366f1",
-                      display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:13, flexShrink:0}}>{i+1}</div>
-                    <p style={{color:"#e2e8f0", fontSize:13, margin:0, lineHeight:1.6}}>{action}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+              e("div",{style:{background:"#f8fafc",borderRadius:8,padding:16,marginBottom:20,border:"1px solid #e2e8f0"}},
+                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:8,color:"#1e293b"}},"Resumen ejecutivo"),
+                e("p",{style:{fontSize:12,color:"#475569",lineHeight:1.7,marginBottom:12}},result.summary),
+                e("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}},
+                  Object.entries(SEV).map(([k,s])=>e("div",{key:k,style:{background:s.bg,border:`1px solid ${s.color}40`,borderRadius:6,padding:10,textAlign:"center"}},
+                    e("div",{style:{fontSize:20,fontWeight:"bold",color:s.color}},result.stats?.[k]||0),
+                    e("div",{style:{fontSize:10,color:s.color,fontWeight:"bold"}},s.label)
+                  ))
+                )
+              ),
 
-        {/* Modal PDF — informe completo */}
-        {showPDF && result && (
-          <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:1000, display:"flex", flexDirection:"column"}}>
-            <div style={{background:"#1e293b", padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid #334155", flexShrink:0}}>
-              <div>
-                <span style={{color:"#f1f5f9", fontWeight:700, fontSize:14}}>📄 Informe completo — {result.siteName}</span>
-                <span style={{color:"#64748b", fontSize:11, marginLeft:12}}>Ctrl+P para guardar como PDF</span>
-              </div>
-              <button onClick={()=>setShowPDF(false)} style={{background:"#ef4444", color:"#fff", border:"none", borderRadius:7, padding:"6px 14px", cursor:"pointer", fontWeight:700, fontSize:13}}>✕ Cerrar</button>
-            </div>
-            <div style={{flex:1, overflow:"auto", background:"#f8fafc"}}>
-              <div style={{maxWidth:780, margin:"0 auto", padding:"32px 24px", background:"#fff", minHeight:"100%"}}>
-
-                {/* Cabecera */}
-                <div style={{borderBottom:"3px solid #6366f1", paddingBottom:18, marginBottom:24}}>
-                  <div style={{fontSize:10, color:"#6366f1", fontWeight:"bold", letterSpacing:1, marginBottom:3}}>INFORME DE ACCESIBILIDAD + GEO — WCAG 2.1 AA</div>
-                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap"}}>
-                    <div>
-                      <h1 style={{fontSize:22, color:"#0f172a", margin:"0 0 4px"}}>{result.siteName}</h1>
-                      <p style={{fontSize:12, color:"#64748b", margin:0}}>{result.url}</p>
-                      <p style={{fontSize:11, color:"#94a3b8", margin:"2px 0 0"}}>{new Date().toLocaleDateString("es-ES",{year:"numeric",month:"long",day:"numeric"})}</p>
-                    </div>
-                    <div style={{display:"flex", gap:10}}>
-                      <div style={{textAlign:"center", padding:"12px 18px", background:"#f8fafc", borderRadius:10, border:"1px solid #e2e8f0"}}>
-                        <div style={{fontSize:32, fontWeight:"bold", color:result.score>=80?"#16a34a":result.score>=60?"#ca8a04":"#dc2626"}}>{result.score}</div>
-                        <div style={{fontSize:10, color:"#64748b"}}>Accesibilidad</div>
-                      </div>
-                      {result.geoScore && (
-                        <div style={{textAlign:"center", padding:"12px 18px", background:"#f8fafc", borderRadius:10, border:"1px solid #e2e8f0"}}>
-                          <div style={{fontSize:32, fontWeight:"bold", color:"#6366f1"}}>{result.geoScore}</div>
-                          <div style={{fontSize:10, color:"#64748b"}}>GEO · IA</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 1. Resumen ejecutivo */}
-                <div style={{background:"#f8fafc", borderRadius:8, padding:16, marginBottom:20, border:"1px solid #e2e8f0"}}>
-                  <h2 style={{fontSize:14, fontWeight:"bold", marginBottom:8, color:"#1e293b"}}>Resumen ejecutivo</h2>
-                  <p style={{fontSize:12, color:"#475569", lineHeight:1.7, marginBottom:12}}>{result.summary}</p>
-                  <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8}}>
-                    {Object.entries(SEV).map(([k,s]) => (
-                      <div key={k} style={{background:s.bg, border:`1px solid ${s.color}40`, borderRadius:6, padding:10, textAlign:"center"}}>
-                        <div style={{fontSize:20, fontWeight:"bold", color:s.color}}>{result.stats?.[k]||0}</div>
-                        <div style={{fontSize:10, color:s.color, fontWeight:"bold"}}>{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 2. WCAG Breakdown */}
-                {result.scoreBreakdown && Object.keys(result.scoreBreakdown).length > 0 && (
-                  <div style={{marginBottom:20}}>
-                    <h2 style={{fontSize:14, fontWeight:"bold", marginBottom:12, color:"#1e293b"}}>Puntuación por principio WCAG 2.1 AA</h2>
-                    <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8}}>
-                      {Object.entries(result.scoreBreakdown).map(([k,v]) => {
-                        const c = v>=80?"#16a34a":v>=60?"#ca8a04":"#dc2626";
-                        return (
-                          <div key={k} style={{background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:6, padding:10}}>
-                            <div style={{display:"flex", justifyContent:"space-between", marginBottom:5}}>
-                              <span style={{fontSize:12, textTransform:"capitalize", color:"#374151"}}>{k}</span>
-                              <span style={{fontSize:14, fontWeight:"bold", color:c}}>{v}</span>
-                            </div>
-                            <div style={{height:5, background:"#e2e8f0", borderRadius:99}}>
-                              <div style={{width:`${v}%`, height:"100%", background:c, borderRadius:99}}/>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Issues accesibilidad */}
-                <div style={{marginBottom:20}}>
-                  <h2 style={{fontSize:14, fontWeight:"bold", marginBottom:12, color:"#1e293b"}}>Issues de accesibilidad detectados ({result.issues?.length||0})</h2>
-                  {Object.entries(SEV).map(([k,s]) => {
-                    const items = (result.issues||[]).filter(i=>i.severity===k);
-                    if (!items.length) return null;
-                    return (
-                      <div key={k} style={{marginBottom:16}}>
-                        <h3 style={{color:s.color, fontSize:12, margin:"0 0 8px", padding:"5px 10px", background:s.bg, borderRadius:5, borderLeft:`3px solid ${s.color}`}}>
-                          {s.label.toUpperCase()} — {items.length} issue{items.length>1?"s":""}
-                        </h3>
-                        {items.map(issue => (
-                          <div key={issue.id} style={{marginBottom:8, padding:10, border:"1px solid #e2e8f0", borderRadius:5}}>
-                            <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
-                              <strong style={{fontSize:12, color:"#1e293b"}}>{issue.title}</strong>
-                              {issue.wcag && <span style={{fontSize:10, background:"#e2e8f0", padding:"1px 6px", borderRadius:99, color:"#475569"}}>{issue.wcag}</span>}
-                            </div>
-                            <p style={{fontSize:11, color:"#475569", margin:"0 0 4px"}}>{issue.description}</p>
-                            {issue.element && <code style={{display:"block", background:"#f1f5f9", padding:"4px 8px", borderRadius:3, fontSize:10, marginBottom:4, wordBreak:"break-all"}}>{issue.element}</code>}
-                            <p style={{fontSize:11, color:"#166534", margin:0}}><strong>Solución:</strong> {issue.fix}</p>
-                          </div>
-                        ))}
-                      </div>
+              result.scoreBreakdown && Object.keys(result.scoreBreakdown).length>0 && e("div",{style:{marginBottom:20}},
+                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},"Puntuación por principio WCAG 2.1 AA"),
+                e("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}},
+                  Object.entries(result.scoreBreakdown).map(([k,v])=>{
+                    const c=v>=80?"#16a34a":v>=60?"#ca8a04":"#dc2626";
+                    return e("div",{key:k,style:{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:6,padding:10}},
+                      e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:5}},
+                        e("span",{style:{fontSize:12,textTransform:"capitalize",color:"#374151"}},k),
+                        e("span",{style:{fontSize:14,fontWeight:"bold",color:c}},v)
+                      ),
+                      e("div",{style:{height:5,background:"#e2e8f0",borderRadius:99}},
+                        e("div",{style:{width:`${v}%`,height:"100%",background:c,borderRadius:99}})
+                      )
                     );
-                  })}
-                </div>
+                  })
+                )
+              ),
 
-                {/* 4. Heat Map visual */}
-                {result.heatZones?.length > 0 && (
-                  <div style={{marginBottom:20}}>
-                    <h2 style={{fontSize:14, fontWeight:"bold", marginBottom:12, color:"#1e293b"}}>🔥 Heat Insights — Mapa de atención visual</h2>
-                    <p style={{fontSize:11, color:"#64748b", marginBottom:10}}>Estimación de zonas con mayor carga cognitiva y atención visual en el sitio auditado.</p>
-                    <div style={{background:"#0f172a", borderRadius:8, padding:14}}>
-                      <div style={{display:"grid", gridTemplateColumns:"repeat(20, 1fr)", gap:2, marginBottom:10}}>
-                        {result.heatZones.map((v,i) => {
-                          const t = v/100;
-                          return <div key={i} style={{height:18, borderRadius:2, background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}}/>;
-                        })}
-                      </div>
-                      <div style={{display:"flex", gap:16, fontSize:11, color:"#64748b"}}>
-                        {[["#ef4444","Alta atención — Header y nav"],["#f59e0b","Media — Contenido principal"],["#22c55e","Baja — Footer"]].map(([c,l]) => (
-                          <span key={l} style={{display:"flex", alignItems:"center", gap:4}}>
-                            <span style={{width:10, height:10, borderRadius:2, background:c, display:"inline-block", flexShrink:0}}/>{l}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:10}}>
-                      {[["🔴 Máxima atención","Header y navegación. Los problemas aquí tienen el mayor impacto en la experiencia."],
-                        ["🟡 Contenido principal","Jerarquías de texto y contraste son críticos en esta área."],
-                        ["🟢 Zona media-baja","CTAs y formularios. Verificar foco y etiquetas."],
-                        ["⚫ Footer","Menor atención pero importante para cumplimiento total."]
-                      ].map(([t,d]) => (
-                        <div key={t} style={{background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:6, padding:10}}>
-                          <p style={{fontSize:12, fontWeight:"bold", margin:"0 0 3px", color:"#1e293b"}}>{t}</p>
-                          <p style={{fontSize:11, color:"#64748b", margin:0, lineHeight:1.5}}>{d}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              e("div",{style:{marginBottom:20}},
+                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},`Issues de accesibilidad detectados (${result.issues?.length||0})`),
+                Object.entries(SEV).map(([k,s])=>{
+                  const items=(result.issues||[]).filter(i=>i.severity===k);
+                  if (!items.length) return null;
+                  return e("div",{key:k,style:{marginBottom:16}},
+                    e("h3",{style:{color:s.color,fontSize:12,margin:"0 0 8px",padding:"5px 10px",background:s.bg,borderRadius:5,borderLeft:`3px solid ${s.color}`}},
+                      `${s.label.toUpperCase()} — ${items.length} issue${items.length>1?"s":""}`),
+                    items.map(issue=>e("div",{key:issue.id,style:{marginBottom:8,padding:10,border:"1px solid #e2e8f0",borderRadius:5}},
+                      e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:4}},
+                        e("strong",{style:{fontSize:12,color:"#1e293b"}},issue.title),
+                        issue.wcag && e("span",{style:{fontSize:10,background:"#e2e8f0",padding:"1px 6px",borderRadius:99,color:"#475569"}},issue.wcag)
+                      ),
+                      e("p",{style:{fontSize:11,color:"#475569",margin:"0 0 4px"}},issue.description),
+                      issue.element && e("code",{style:{display:"block",background:"#f1f5f9",padding:"4px 8px",borderRadius:3,fontSize:10,marginBottom:4,wordBreak:"break-all"}},issue.element),
+                      e("p",{style:{fontSize:11,color:"#166534",margin:0}},e("strong",null,"Solución: "),issue.fix)
+                    ))
+                  );
+                })
+              ),
 
-                {/* 5. GEO completo */}
-                {result.geoScore && result.geoIssues?.length > 0 && (
-                  <div style={{marginBottom:20, background:"#f0f0ff", borderRadius:8, padding:16, border:"1px solid #c7d2fe"}}>
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4, flexWrap:"wrap", gap:8}}>
-                      <h2 style={{fontSize:14, fontWeight:"bold", color:"#4338ca", margin:0}}>🤖 Visibilidad en IAs — Generative Engine Optimization</h2>
-                      <div style={{textAlign:"center", background:"#fff", borderRadius:8, padding:"6px 14px", border:"1px solid #c7d2fe"}}>
-                        <span style={{fontSize:20, fontWeight:"bold", color:"#6366f1"}}>{result.geoScore}</span>
-                        <span style={{fontSize:11, color:"#64748b"}}>/100</span>
-                      </div>
-                    </div>
-                    <p style={{fontSize:12, color:"#6366f1", marginBottom:12, lineHeight:1.6}}>{result.geoSummary}</p>
-                    {result.geoIssues.map(i => {
-                      const s = SEV[i.severity]||SEV.minor;
-                      return (
-                        <div key={i.id} style={{marginBottom:8, padding:10, background:"#fff", borderRadius:5, borderLeft:`3px solid ${s.color}`}}>
-                          <div style={{display:"flex", gap:6, alignItems:"center", marginBottom:3}}>
-                            <span style={{fontSize:14}}>{i.icon}</span>
-                            <strong style={{fontSize:12, color:"#1e293b"}}>{i.title}</strong>
-                            <span style={{background:s.color, color:"#fff", fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:99, marginLeft:"auto"}}>{s.label}</span>
-                            <span style={{fontSize:10, color:"#94a3b8", background:"#f1f5f9", padding:"1px 6px", borderRadius:99}}>{i.category}</span>
-                          </div>
-                          <p style={{fontSize:11, color:"#475569", margin:"0 0 3px"}}>{i.description}</p>
-                          <p style={{fontSize:11, color:"#166534", margin:0}}><strong>Acción:</strong> {i.fix}</p>
-                        </div>
-                      );
-                    })}
-                    <div style={{marginTop:12, background:"#ede9fe", borderRadius:6, padding:12}}>
-                      <p style={{fontSize:12, fontWeight:"bold", color:"#4338ca", margin:"0 0 8px"}}>💡 Quick wins para aparecer en IAs</p>
-                      {["Publica datos o estudios originales — las IAs citan estadísticas únicas",
-                        "Usa formato pregunta-respuesta: '¿Qué es X?', '¿Cómo funciona Y?'",
-                        "Consigue menciones en medios del sector — las IAs aprenden de fuentes de autoridad"
-                      ].map((tip,i) => (
-                        <div key={i} style={{display:"flex", gap:6, padding:"4px 0", borderTop:i>0?"1px solid #ddd6fe":"none"}}>
-                          <span style={{color:"#6366f1", fontWeight:"bold"}}>→</span>
-                          <p style={{fontSize:11, color:"#4338ca", margin:0, lineHeight:1.5}}>{tip}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              result.heatZones?.length>0 && e("div",{style:{marginBottom:20}},
+                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},"🔥 Heat Insights — Mapa de atención visual"),
+                e("p",{style:{fontSize:11,color:"#64748b",marginBottom:10}},"Estimación de zonas con mayor carga cognitiva y atención visual en el sitio auditado."),
+                e("div",{style:{background:"#0f172a",borderRadius:8,padding:14}},
+                  e("div",{style:{display:"grid",gridTemplateColumns:"repeat(20, 1fr)",gap:2,marginBottom:10}},
+                    result.heatZones.map((v,i)=>{const t=v/100;return e("div",{key:i,style:{height:18,borderRadius:2,background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}});})
+                  ),
+                  e("div",{style:{display:"flex",gap:16,fontSize:11,color:"#64748b"}},
+                    [["#ef4444","Alta — Header y nav"],["#f59e0b","Media — Contenido"],["#22c55e","Baja — Footer"]].map(([c,l])=>
+                      e("span",{key:l,style:{display:"flex",alignItems:"center",gap:4}},e("span",{style:{width:10,height:10,borderRadius:2,background:c,display:"inline-block",flexShrink:0}}),l)
+                    )
+                  )
+                ),
+                e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:10}},
+                  [["🔴 Máxima atención","Header y navegación. Mayor impacto en la experiencia."],
+                   ["🟡 Contenido principal","Jerarquías de texto y contraste críticos aquí."],
+                   ["🟢 Zona media-baja","CTAs y formularios. Verificar foco y etiquetas."],
+                   ["⚫ Footer","Menor atención pero importante para cumplimiento total."]
+                  ].map(([t,d])=>e("div",{key:t,style:{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:6,padding:10}},
+                    e("p",{style:{fontSize:12,fontWeight:"bold",margin:"0 0 3px",color:"#1e293b"}},t),
+                    e("p",{style:{fontSize:11,color:"#64748b",margin:0,lineHeight:1.5}},d)
+                  ))
+                )
+              ),
 
-                {/* 6. Plan de acción */}
-                {result.priorityActions?.length > 0 && (
-                  <div style={{marginBottom:20}}>
-                    <h2 style={{fontSize:14, fontWeight:"bold", marginBottom:12, color:"#1e293b"}}>✅ Plan de acción prioritario</h2>
-                    {result.priorityActions.map((a,i) => (
-                      <div key={i} style={{display:"flex", gap:10, padding:10, background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:6, marginBottom:6}}>
-                        <div style={{minWidth:26, height:26, borderRadius:"50%", background:["#ef4444","#f97316","#eab308"][i]||"#6366f1", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:"bold", fontSize:12, flexShrink:0}}>{i+1}</div>
-                        <p style={{fontSize:12, color:"#374151", margin:0, lineHeight:1.6}}>{a}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              result.geoScore && result.geoIssues?.length>0 && e("div",{style:{marginBottom:20,background:"#f0f0ff",borderRadius:8,padding:16,border:"1px solid #c7d2fe"}},
+                e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}},
+                  e("h2",{style:{fontSize:14,fontWeight:"bold",color:"#4338ca",margin:0}},"🤖 Visibilidad en IAs — GEO"),
+                  e("div",{style:{textAlign:"center",background:"#fff",borderRadius:8,padding:"6px 14px",border:"1px solid #c7d2fe"}},
+                    e("span",{style:{fontSize:20,fontWeight:"bold",color:"#6366f1"}},result.geoScore),
+                    e("span",{style:{fontSize:11,color:"#64748b"}},"/100")
+                  )
+                ),
+                e("p",{style:{fontSize:12,color:"#6366f1",marginBottom:12,lineHeight:1.6}},result.geoSummary),
+                result.geoIssues.map(i=>{
+                  const s=SEV[i.severity]||SEV.minor;
+                  return e("div",{key:i.id,style:{marginBottom:8,padding:10,background:"#fff",borderRadius:5,borderLeft:`3px solid ${s.color}`}},
+                    e("div",{style:{display:"flex",gap:6,alignItems:"center",marginBottom:3}},
+                      e("span",{style:{fontSize:14}},i.icon),
+                      e("strong",{style:{fontSize:12,color:"#1e293b"}},i.title),
+                      e("span",{style:{background:s.color,color:"#fff",fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:99,marginLeft:"auto"}},s.label),
+                      e("span",{style:{fontSize:10,color:"#94a3b8",background:"#f1f5f9",padding:"1px 6px",borderRadius:99}},i.category)
+                    ),
+                    e("p",{style:{fontSize:11,color:"#475569",margin:"0 0 3px"}},i.description),
+                    e("p",{style:{fontSize:11,color:"#166534",margin:0}},e("strong",null,"Acción: "),i.fix)
+                  );
+                }),
+                e("div",{style:{marginTop:12,background:"#ede9fe",borderRadius:6,padding:12}},
+                  e("p",{style:{fontSize:12,fontWeight:"bold",color:"#4338ca",margin:"0 0 8px"}},"💡 Quick wins para aparecer en IAs"),
+                  ["Publica datos o estudios originales — las IAs citan estadísticas únicas",
+                   "Usa formato pregunta-respuesta: '¿Qué es X?', '¿Cómo funciona Y?'",
+                   "Consigue menciones en medios del sector — las IAs aprenden de fuentes de autoridad"
+                  ].map((tip,i)=>e("div",{key:i,style:{display:"flex",gap:6,padding:"4px 0",borderTop:i>0?"1px solid #ddd6fe":"none"}},
+                    e("span",{style:{color:"#6366f1",fontWeight:"bold"}},"→"),
+                    e("p",{style:{fontSize:11,color:"#4338ca",margin:0,lineHeight:1.5}},tip)
+                  ))
+                )
+              ),
 
-                {/* Footer */}
-                <div style={{borderTop:"1px solid #e2e8f0", paddingTop:12, fontSize:10, color:"#94a3b8", display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:6}}>
-                  <span>Accessibility + GEO Auditor · WCAG 2.1 AA</span>
-                  <span>{new Date().toLocaleDateString("es-ES",{year:"numeric",month:"long",day:"numeric"})}</span>
-                  <span>{result.passedChecks}/{result.totalChecks} verificaciones superadas</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+              result.priorityActions?.length>0 && e("div",{style:{marginBottom:20}},
+                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},"✅ Plan de acción prioritario"),
+                result.priorityActions.map((a,i)=>e("div",{key:i,style:{display:"flex",gap:10,padding:10,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:6,marginBottom:6}},
+                  e("div",{style:{minWidth:26,height:26,borderRadius:"50%",background:["#ef4444","#f97316","#eab308"][i]||"#6366f1",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:"bold",fontSize:12,flexShrink:0}},i+1),
+                  e("p",{style:{fontSize:12,color:"#374151",margin:0,lineHeight:1.6}},a)
+                ))
+              ),
 
-        {/* Estado inicial */}
-        {!result && !loading && (
-          <div style={{textAlign:"center", padding:"30px 16px", color:"#475569"}}>
-            <p style={{fontSize:14}}>Introduce una URL y elige el tipo de análisis</p>
-            <div style={{display:"flex", justifyContent:"center", gap:8, marginTop:14, flexWrap:"wrap"}}>
-              {["⚡ Rápido: score en 5s","🔬 Completo: WCAG + GEO + PDF","🔥 Heat Map","✅ Plan de acción"].map(f => (
-                <span key={f} style={{fontSize:12, color:"#64748b", background:"#1e293b", padding:"4px 12px", borderRadius:99, border:"1px solid #334155"}}>{f}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
-    </div>
+              e("div",{style:{borderTop:"1px solid #e2e8f0",paddingTop:12,fontSize:10,color:"#94a3b8",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:6}},
+                e("span",null,"Accessibility + GEO Auditor · WCAG 2.1 AA"),
+                e("span",null,new Date().toLocaleDateString("es-ES",{year:"numeric",month:"long",day:"numeric"})),
+                e("span",null,`${result.passedChecks}/${result.totalChecks} verificaciones superadas`)
+              )
+            )
+          )
+        )
+      ),
+
+      !result && !loading && e("div",{style:{textAlign:"center",padding:"30px 16px",color:"#475569"}},
+        e("p",{style:{fontSize:14}},"Introduce una URL y elige el tipo de análisis"),
+        e("div",{style:{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}},
+          ["⚡ Rápido: score en 5s","🔬 Completo: WCAG + GEO + PDF","🔥 Heat Map","✅ Plan de acción"].map(f=>
+            e("span",{key:f,style:{fontSize:12,color:"#64748b",background:"#1e293b",padding:"4px 12px",borderRadius:99,border:"1px solid #334155"}},f)
+          )
+        )
+      )
+    )
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+</script>
+</body>
+</html>
