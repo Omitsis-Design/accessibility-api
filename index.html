@@ -206,11 +206,11 @@
       const [filterSev, setFilter]  = useState("all");
       const [showPDF, setShowPDF]   = useState(false);
 
-      async function audit() {
+      async function audit(mode = "full") {
         if (!url.trim()) return;
         setResult(null); setPhase1(null); setError(""); setLoading(true); setTab("a11y"); setFilter("all");
 
-        // FASE 1
+        // FASE 1 — siempre
         setPhase(1);
         try {
           const res = await fetch(`${API_URL}/audit`, {
@@ -235,9 +235,18 @@
             passedChecks:data.stats?.passedChecks||0, totalChecks:data.stats?.totalChecks||0,
             summary:`Análisis real con axe-core WCAG 2.1 AA. ${stats.critical||0} issue${stats.critical!==1?"s":""} crítico${stats.critical!==1?"s":""} detectado${stats.critical!==1?"s":""}.`
           };
+
+          // Si es análisis rápido, mostrar solo fase 1 y parar
+          if (mode === "quick") {
+            setResult({ ...p1, geoScore: null, geoIssues:[], heatZones:[], scoreBreakdown:{}, geoSummary:"", priorityActions:[] });
+            setPhase(3);
+            setLoading(false);
+            return;
+          }
+
           setPhase1(p1);
 
-          // FASE 2
+          // FASE 2 — solo en auditoría completa
           setPhase(2);
           await new Promise(r => setTimeout(r, 400));
 
@@ -288,13 +297,24 @@
 
           // Input
           e("div", { style:{background:"#1e293b", borderRadius:14, padding:16, marginBottom:14, border:"1px solid #334155"} },
-            e("div", { style:{display:"flex", gap:8} },
-              e("input", { value:url, onChange:ev=>setUrl(ev.target.value), onKeyDown:ev=>ev.key==="Enter"&&!loading&&audit(),
+            e("div", { style:{display:"flex", gap:8, marginBottom:10} },
+              e("input", { value:url, onChange:ev=>setUrl(ev.target.value), onKeyDown:ev=>ev.key==="Enter"&&!loading&&audit("quick"),
                 placeholder:"https://ejemplo.com",
-                style:{flex:1, padding:"11px 14px", borderRadius:9, border:"1px solid #475569", background:"#0f172a", color:"#f1f5f9", fontSize:14, outline:"none"} }),
-              e("button", { onClick:audit, disabled:loading||!url.trim(),
-                style:{padding:"11px 20px", borderRadius:9, background:loading?"#4338ca":"#6366f1", color:"#fff", border:"none", cursor:"pointer", fontWeight:700, fontSize:13, minWidth:110} },
-                loading?"Analizando...":"🔍 Auditar")
+                style:{flex:1, padding:"11px 14px", borderRadius:9, border:"1px solid #475569", background:"#0f172a", color:"#f1f5f9", fontSize:14, outline:"none"} })
+            ),
+            e("div", { style:{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8} },
+              e("button", { onClick:()=>audit("quick"), disabled:loading||!url.trim(),
+                style:{padding:"12px", borderRadius:9, background:loading?"#334155":"#1e293b", color:loading?"#64748b":"#a5b4fc",
+                  border:"1px solid #6366f1", cursor:"pointer", fontWeight:700, fontSize:13, textAlign:"center"} },
+                e("div", null, "⚡ Análisis rápido"),
+                e("div", { style:{fontSize:11, fontWeight:400, opacity:0.7, marginTop:2} }, "Score + resumen en 5s")
+              ),
+              e("button", { onClick:()=>audit("full"), disabled:loading||!url.trim(),
+                style:{padding:"12px", borderRadius:9, background:loading?"#4338ca":"#6366f1", color:"#fff",
+                  border:"none", cursor:"pointer", fontWeight:700, fontSize:13, textAlign:"center"} },
+                e("div", null, "🔬 Auditoría completa"),
+                e("div", { style:{fontSize:11, fontWeight:400, opacity:0.8, marginTop:2} }, "Issues + GEO + PDF")
+              )
             ),
             error && e("p", { style:{color:"#ef4444", fontSize:12, marginTop:8} }, error)
           ),
