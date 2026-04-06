@@ -19,7 +19,6 @@
 const { useState } = React;
 const e = React.createElement;
 
-// ─── BACKEND REAL ────────────────────────────────────────────────
 const API_URL = "https://accessibility-api-production.up.railway.app";
 
 const SEV = {
@@ -30,12 +29,12 @@ const SEV = {
 };
 
 const GEO_ISSUES = [
-  { severity:"critical", category:"Autoridad",  icon:"👤", title:"Sin señales E-E-A-T",                  description:"No hay señales de Experiencia, Expertise, Autoridad o Confianza.",       fix:"Añadir página 'Sobre nosotros' con biografías y credenciales." },
-  { severity:"critical", category:"Técnico",    icon:"🏗️", title:"Sin datos estructurados Schema.org",   description:"Sin marcado Schema.org para que las IAs entiendan el contenido.",       fix:"Implementar Schema Organization, Article o FAQPage." },
-  { severity:"serious",  category:"Contenido",  icon:"❓", title:"Sin formato pregunta-respuesta",        description:"Las IAs favorecen contenido que responde preguntas directas.",           fix:"Añadir secciones FAQ y encabezados en formato pregunta." },
-  { severity:"serious",  category:"Contenido",  icon:"📚", title:"Falta de fuentes verificables",         description:"Contenido sin referencias tiene menor probabilidad de ser citado.",      fix:"Citar estudios y estadísticas con fuentes verificables." },
-  { severity:"moderate", category:"Visibilidad",icon:"⚡", title:"No optimizado para respuestas directas",description:"Las IAs extraen respuestas concisas; el contenido no está formateado.", fix:"Usar listas numeradas y definiciones en las primeras 2 frases." },
-  { severity:"minor",    category:"Técnico",    icon:"🤖", title:"Revisar robots.txt para bots IA",       description:"GPTBot o PerplexityBot pueden estar bloqueados.",                      fix:"Revisar robots.txt y permitir bots de IA relevantes." },
+  { severity:"critical", category:"Autoridad",  icon:"👤", title:"Sin señales E-E-A-T", description:"No hay señales de Experiencia, Expertise, Autoridad o Confianza.", fix:"Añadir página 'Sobre nosotros' con biografías y credenciales." },
+  { severity:"critical", category:"Técnico",    icon:"🏗️", title:"Sin datos estructurados Schema.org", description:"Sin marcado Schema.org para que las IAs entiendan el contenido.", fix:"Implementar Schema Organization, Article o FAQPage." },
+  { severity:"serious",  category:"Contenido",  icon:"❓", title:"Sin formato pregunta-respuesta", description:"Las IAs favorecen contenido que responde preguntas directas.", fix:"Añadir secciones FAQ y encabezados en formato pregunta." },
+  { severity:"serious",  category:"Contenido",  icon:"📚", title:"Falta de fuentes verificables", description:"Contenido sin referencias tiene menor probabilidad de ser citado.", fix:"Citar estudios y estadísticas con fuentes verificables." },
+  { severity:"moderate", category:"Visibilidad",icon:"⚡", title:"No optimizado para respuestas directas", description:"Las IAs extraen respuestas concisas; el contenido no está formateado.", fix:"Usar listas numeradas y definiciones en las primeras 2 frases." },
+  { severity:"minor",    category:"Técnico",    icon:"🤖", title:"Revisar robots.txt para bots IA", description:"GPTBot o PerplexityBot pueden estar bloqueados.", fix:"Revisar robots.txt y permitir bots de IA relevantes." },
 ];
 
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
@@ -77,8 +76,7 @@ function IssueCard({ issue, geo }) {
       e("div",{style:{background:"#dbeafe",borderRadius:6,padding:"7px 10px",borderLeft:"3px solid #3b82f6",marginTop:6}},
         e("p",{style:{fontSize:12,color:"#1e3a5f",margin:0}},e("strong",null,"Solución: "),issue.fix)
       ),
-      issue.helpUrl && e("a",{href:issue.helpUrl,target:"_blank",rel:"noopener noreferrer",
-        style:{display:"inline-block",marginTop:6,fontSize:11,color:"#6366f1"}},"Ver criterio WCAG →")
+      issue.helpUrl && e("a",{href:issue.helpUrl,target:"_blank",rel:"noopener noreferrer",style:{display:"inline-block",marginTop:6,fontSize:11,color:"#6366f1"}},"Ver criterio WCAG →")
     )
   );
 }
@@ -86,176 +84,195 @@ function IssueCard({ issue, geo }) {
 function HeatMap({ data }) {
   return e("div",{style:{background:"#0f172a",borderRadius:10,padding:14}},
     e("p",{style:{color:"#64748b",fontSize:11,margin:"0 0 10px"}},"Zonas de mayor carga cognitiva y atención visual estimada"),
-    e("div",{style:{display:"grid",gridTemplateColumns:"repeat(20, 1fr)",gap:2}},
-      data.map((v,i)=>{const t=v/100; return e("div",{key:i,style:{height:16,borderRadius:2,background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}});})
+    e("div",{style:{display:"grid",gridTemplateColumns:"repeat(20,1fr)",gap:2}},
+      data.map((v,i)=>{const t=v/100;return e("div",{key:i,style:{height:16,borderRadius:2,background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}});})
     ),
     e("div",{style:{display:"flex",gap:16,marginTop:10,fontSize:11,color:"#64748b"}},
       [["#ef4444","Alta"],["#f59e0b","Media"],["#22c55e","Baja"]].map(([c,l])=>
-        e("span",{key:l,style:{display:"flex",alignItems:"center",gap:4}},
-          e("span",{style:{width:10,height:10,borderRadius:2,background:c,display:"inline-block"}}),l)
+        e("span",{key:l,style:{display:"flex",alignItems:"center",gap:4}},e("span",{style:{width:10,height:10,borderRadius:2,background:c,display:"inline-block"}}),l)
       )
     )
   );
 }
 
+async function callBackend(url) {
+  const input = url.startsWith("http") ? url : "https://"+url;
+  const res = await fetch(`${API_URL}/audit`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ url: input })
+  });
+  if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error||`Error ${res.status}`); }
+  const data = await res.json();
+  const issues = (data.violations||[]).map((v,i)=>({
+    id:`a${i}`, severity:v.severity, title:v.title, wcag:v.wcag,
+    description:v.description, element:v.nodes?.[0]?.html||null,
+    fix:v.nodes?.[0]?.message||"Revisar criterio WCAG.", helpUrl:v.helpUrl,
+  }));
+  const stats = {critical:0,serious:0,moderate:0,minor:0};
+  issues.forEach(i=>stats[i.severity]=(stats[i.severity]||0)+1);
+  let siteName="Sitio web";
+  try { siteName=new URL(input).hostname.replace("www.",""); } catch {}
+  return {
+    url:input, siteName:data.pageTitle||siteName, score:data.score,
+    issues, stats, passedChecks:data.stats?.passedChecks||0, totalChecks:data.stats?.totalChecks||issues.length,
+    summary:`${issues.length} issue${issues.length!==1?"s":""} detectado${issues.length!==1?"s":""} con axe-core. ${stats.critical||0} crítico${stats.critical!==1?"s":""}. Cumplimiento ${Math.round(((data.stats?.passedChecks||0)/Math.max(data.stats?.totalChecks||1,1))*100)}%.`,
+    scoreBreakdown:{
+      perceptible:Math.max(10,data.score+Math.floor(Math.random()*10)-5),
+      operable:Math.max(10,data.score-5+Math.floor(Math.random()*12)),
+      comprensible:Math.max(10,data.score+5+Math.floor(Math.random()*8)),
+      robusto:Math.max(10,data.score-8+Math.floor(Math.random()*15)),
+    }
+  };
+}
+
 function App() {
-  const [url,setUrl]           = useState("");
-  const [loading,setLoading]   = useState(false);
-  const [loadingMode,setLMode] = useState("");
-  const [phase,setPhase]       = useState(0);
-  const [phase1,setPhase1]     = useState(null);
-  const [result,setResult]     = useState(null);
-  const [error,setError]       = useState("");
-  const [tab,setTab]           = useState("a11y");
-  const [filterSev,setFilter]  = useState("all");
-  const [showPDF,setShowPDF]   = useState(false);
+  const [inputMode,setInputMode]   = useState("single");
+  const [singleUrl,setSingleUrl]   = useState("");
+  const [multiUrls,setMultiUrls]   = useState(["","",""]);
+  const [loading,setLoading]       = useState(false);
+  const [loadPhase,setLoadPhase]   = useState(0);
+  const [loadStep,setLoadStep]     = useState(0);
+  const [phase1,setPhase1]         = useState(null);
+  const [result,setResult]         = useState(null);
+  const [multiResults,setMultiResults] = useState([]);
+  const [error,setError]           = useState("");
+  const [tab,setTab]               = useState("a11y");
+  const [filterSev,setFilter]      = useState("all");
+  const [showPDF,setShowPDF]       = useState(false);
 
-  async function audit(mode) {
-    if (!url.trim()) return;
-    setResult(null); setPhase1(null); setError(""); setLoading(true); setLMode(mode); setTab("a11y"); setFilter("all"); setPhase(0);
-    const input = url.trim().startsWith("http") ? url.trim() : "https://"+url.trim();
-    let siteName="Sitio web";
-    try { siteName = new URL(input).hostname.replace("www.",""); } catch {}
-
-    // ── FASE 1 — llamada al backend real ──────────────────────────
-    setPhase(1);
+  async function auditSingle(mode) {
+    if (!singleUrl.trim()) return;
+    setResult(null); setPhase1(null); setMultiResults([]); setError(""); setLoading(true); setTab("a11y"); setFilter("all"); setLoadPhase(1);
     try {
-      const res = await fetch(`${API_URL}/audit`, {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ url: input })
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({}));
-        throw new Error(err.error || `Error del servidor: ${res.status}`);
+      const p1 = await callBackend(singleUrl.trim());
+      if (mode==="quick") {
+        setResult({...p1,geoScore:null,geoIssues:[],heatZones:[],geoSummary:"",priorityActions:[]});
+        setLoadPhase(3); setLoading(false); return;
       }
-      const data = await res.json();
-
-      // Mapear todos los violations del backend — sin límite
-      const issues = (data.violations || []).map((v,i) => ({
-        id: `a${i}`,
-        severity: v.severity,
-        title: v.title,
-        wcag: v.wcag,
-        description: v.description,
-        element: v.nodes?.[0]?.html || null,
-        fix: v.nodes?.[0]?.message || "Revisar criterio WCAG.",
-        helpUrl: v.helpUrl,
-      }));
-
-      const stats = {critical:0,serious:0,moderate:0,minor:0};
-      issues.forEach(i => stats[i.severity] = (stats[i.severity]||0)+1);
-
-      const passedChecks = data.stats?.passedChecks || 0;
-      const totalChecks  = data.stats?.totalChecks  || issues.length;
-
-      const p1 = {
-        siteName: data.pageTitle || siteName,
-        url: input, score: data.score, stats, issues, passedChecks, totalChecks,
-        summary: `${issues.length} issue${issues.length!==1?"s":""} detectado${issues.length!==1?"s":""} con axe-core WCAG 2.1 AA. ${stats.critical||0} crítico${stats.critical!==1?"s":""}.`,
-        scoreBreakdown: {
-          perceptible:  Math.max(10, data.score + Math.floor(Math.random()*10)-5),
-          operable:     Math.max(10, data.score - 5 + Math.floor(Math.random()*12)),
-          comprensible: Math.max(10, data.score + 5 + Math.floor(Math.random()*8)),
-          robusto:      Math.max(10, data.score - 8 + Math.floor(Math.random()*15)),
-        }
-      };
-
-      // Análisis rápido → parar aquí
-      if (mode === "quick") {
-        setResult({...p1, geoScore:null, geoIssues:[], heatZones:[], geoSummary:"", priorityActions:[]});
-        setPhase(3); setLoading(false); return;
-      }
-
-      setPhase1(p1);
-
-      // ── FASE 2 — GEO + Heat Map ───────────────────────────────
-      setPhase(2);
-      await new Promise(r=>setTimeout(r,500));
-
+      setPhase1(p1); setLoadPhase(2);
+      await new Promise(r=>setTimeout(r,400));
       const geoIssues = shuffle(GEO_ISSUES).slice(0,4+Math.floor(Math.random()*2)).map((x,i)=>({...x,id:`g${i}`}));
-      const geoScore  = Math.max(20, Math.min(90, 85 - geoIssues.filter(i=>i.severity==="critical").length*14 - geoIssues.filter(i=>i.severity==="serious").length*7));
-      const heatZones = Array.from({length:40},(_,i)=>Math.round(Math.max(5,90-i*2+(Math.random()-0.5)*20)));
-
-      setResult({
-        ...p1, geoScore, geoIssues, heatZones,
-        geoSummary: `${geoIssues.filter(i=>i.severity==="critical").length} problema${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} crítico${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} afectan tu visibilidad en ChatGPT, Perplexity y Claude.`,
-        priorityActions: [
-          issues.filter(i=>i.severity==="critical")[0]?.title ? `Corregir issues críticos: ${issues.filter(i=>i.severity==="critical").map(i=>i.title).slice(0,2).join(" y ")}` : "Revisar issues graves de accesibilidad",
-          geoIssues.filter(i=>i.severity==="critical")[0]?.title ? `Prioridad GEO: ${geoIssues.filter(i=>i.severity==="critical")[0].title}` : "Mejorar señales de autoridad y E-E-A-T",
-          "Añadir datos estructurados Schema.org y formato pregunta-respuesta al contenido"
+      const geoScore = Math.max(20,Math.min(90,85-geoIssues.filter(i=>i.severity==="critical").length*14-geoIssues.filter(i=>i.severity==="serious").length*7));
+      setResult({...p1,geoScore,geoIssues,
+        heatZones:Array.from({length:40},(_,i)=>Math.round(Math.max(5,90-i*2+(Math.random()-0.5)*20))),
+        geoSummary:`${geoIssues.filter(i=>i.severity==="critical").length} problema${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} crítico${geoIssues.filter(i=>i.severity==="critical").length!==1?"s":""} afectan tu visibilidad en ChatGPT, Perplexity y Claude.`,
+        priorityActions:[
+          p1.issues.filter(i=>i.severity==="critical")[0]?.title?`Corregir: ${p1.issues.filter(i=>i.severity==="critical").map(i=>i.title).slice(0,2).join(" y ")}`:"Revisar issues graves de accesibilidad",
+          geoIssues.filter(i=>i.severity==="critical")[0]?.title?`GEO: ${geoIssues.filter(i=>i.severity==="critical")[0].title}`:"Mejorar señales de autoridad y E-E-A-T",
+          "Añadir Schema.org y formato pregunta-respuesta al contenido"
         ]
       });
-      setPhase(3);
-
-    } catch(err) {
-      setError(`Error: ${err.message}`);
-      setPhase(0);
-    }
+      setLoadPhase(3);
+    } catch(err) { setError(`Error: ${err.message}`); setLoadPhase(0); }
     setLoading(false);
+  }
+
+  async function auditMulti() {
+    const valid = multiUrls.map(u=>u.trim()).filter(Boolean);
+    if (!valid.length) return;
+    setResult(null); setPhase1(null); setMultiResults([]); setError(""); setLoading(true); setLoadStep(0);
+    const results = [];
+    for (let i=0; i<valid.length; i++) {
+      setLoadStep(i);
+      try { results.push(await callBackend(valid[i])); }
+      catch(err) { results.push({url:valid[i],siteName:valid[i],score:0,issues:[],stats:{critical:0,serious:0,moderate:0,minor:0},passedChecks:0,totalChecks:0,summary:`Error: ${err.message}`}); }
+    }
+    setMultiResults(results); setLoadStep(valid.length); setLoading(false);
   }
 
   const tabBtn = (id,label) => e("button",{onClick:()=>setTab(id),style:{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:tab===id?"#6366f1":"transparent",color:tab===id?"#fff":"#64748b"}},label);
   const filtered = result?.issues?.filter(i=>filterSev==="all"||i.severity===filterSev)||[];
+  const validMulti = multiUrls.filter(u=>u.trim());
 
-  return e("div",{style:{minHeight:"100vh",padding:"20px 16px 0 16px"}},
+  return e("div",{style:{minHeight:"100vh",padding:"20px 16px 0"}},
     e("div",{style:{width:"100%",maxWidth:860,margin:"0 auto"}},
 
       e("div",{style:{textAlign:"center",marginBottom:22}},
         e("div",{style:{fontSize:34,marginBottom:4}},"♿"),
         e("h1",{style:{color:"#f8fafc",fontSize:24,fontWeight:800,margin:0}},"Accessibility + GEO Auditor"),
-        e("p",{style:{color:"#94a3b8",fontSize:12,marginTop:4}},"Análisis real · WCAG 2.1 AA · GEO · 2 fases · Informe PDF")
+        e("p",{style:{color:"#94a3b8",fontSize:12,marginTop:4}},"Análisis real · WCAG 2.1 AA · GEO · Multi-URL · Informe PDF")
       ),
 
+      // Input panel
       e("div",{style:{background:"#1e293b",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #334155"}},
-        e("input",{value:url,onChange:ev=>setUrl(ev.target.value),onKeyDown:ev=>ev.key==="Enter"&&!loading&&audit("full"),
-          placeholder:"https://ejemplo.com",
-          style:{width:"100%",padding:"11px 14px",borderRadius:9,border:"1px solid #475569",background:"#0f172a",color:"#f1f5f9",fontSize:14,outline:"none",marginBottom:10}}),
-        e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},
-          e("button",{onClick:()=>audit("quick"),disabled:loading||!url.trim(),
-            style:{padding:"14px 12px",borderRadius:10,background:"#0f172a",color:loading&&loadingMode==="quick"?"#64748b":"#a5b4fc",
-              border:"1px solid #6366f1",cursor:loading?"default":"pointer",fontWeight:700,fontSize:13,textAlign:"center",opacity:loading&&loadingMode==="full"?0.5:1}},
-            e("div",{style:{fontSize:18,marginBottom:4}},"⚡"),
-            e("div",null,"Análisis rápido"),
-            e("div",{style:{fontSize:11,fontWeight:400,color:"#64748b",marginTop:3}},"Score + issues en ~15s")
-          ),
-          e("button",{onClick:()=>audit("full"),disabled:loading||!url.trim(),
-            style:{padding:"14px 12px",borderRadius:10,background:loading&&loadingMode==="full"?"#4338ca":"#6366f1",color:"#fff",
-              border:"none",cursor:loading?"default":"pointer",fontWeight:700,fontSize:13,textAlign:"center",opacity:loading&&loadingMode==="quick"?0.5:1}},
-            e("div",{style:{fontSize:18,marginBottom:4}},"🔬"),
-            e("div",null,"Auditoría completa"),
-            e("div",{style:{fontSize:11,fontWeight:400,opacity:0.75,marginTop:3}},"+GEO + Heat Map + PDF")
+        e("div",{style:{display:"flex",gap:6,marginBottom:12}},
+          e("button",{onClick:()=>{setInputMode("single");setResult(null);setMultiResults([]);setError("");},
+            style:{flex:1,padding:"9px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:inputMode==="single"?"#6366f1":"#0f172a",color:inputMode==="single"?"#fff":"#64748b"}},
+            "🔗 URL única"),
+          e("button",{onClick:()=>{setInputMode("multi");setResult(null);setMultiResults([]);setError("");},
+            style:{flex:1,padding:"9px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:inputMode==="multi"?"#6366f1":"#0f172a",color:inputMode==="multi"?"#fff":"#64748b"}},
+            "🔗🔗 Multi-URL — Toda la web")
+        ),
+
+        inputMode==="single" && e("div",null,
+          e("input",{value:singleUrl,onChange:ev=>setSingleUrl(ev.target.value),onKeyDown:ev=>ev.key==="Enter"&&!loading&&auditSingle("full"),
+            placeholder:"https://ejemplo.com",
+            style:{width:"100%",padding:"11px 14px",borderRadius:9,border:"1px solid #475569",background:"#0f172a",color:"#f1f5f9",fontSize:14,outline:"none",marginBottom:10}}),
+          e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},
+            e("button",{onClick:()=>auditSingle("quick"),disabled:loading||!singleUrl.trim(),
+              style:{padding:"14px 12px",borderRadius:10,background:"#0f172a",color:"#a5b4fc",border:"1px solid #6366f1",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center"}},
+              e("div",{style:{fontSize:18,marginBottom:4}},"⚡"),e("div",null,"Análisis rápido"),
+              e("div",{style:{fontSize:11,fontWeight:400,color:"#64748b",marginTop:3}},"Score + issues en ~15s")),
+            e("button",{onClick:()=>auditSingle("full"),disabled:loading||!singleUrl.trim(),
+              style:{padding:"14px 12px",borderRadius:10,background:loading?"#4338ca":"#6366f1",color:"#fff",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center"}},
+              e("div",{style:{fontSize:18,marginBottom:4}},"🔬"),e("div",null,"Auditoría completa"),
+              e("div",{style:{fontSize:11,fontWeight:400,opacity:0.75,marginTop:3}},"+GEO + Heat Map + PDF"))
+          )
+        ),
+
+        inputMode==="multi" && e("div",null,
+          e("p",{style:{color:"#94a3b8",fontSize:12,margin:"0 0 10px"}},"Añade todas las páginas de tu web que quieras auditar:"),
+          multiUrls.map((u,i)=>e("div",{key:i,style:{display:"flex",gap:6,marginBottom:8}},
+            e("input",{value:u,onChange:ev=>{const nu=[...multiUrls];nu[i]=ev.target.value;setMultiUrls(nu);},
+              placeholder:`https://ejemplo.com${i===0?"":i===1?"/servicios":i===2?"/contacto":"/pagina-"+i}`,
+              style:{flex:1,padding:"10px 14px",borderRadius:9,border:"1px solid #475569",background:"#0f172a",color:"#f1f5f9",fontSize:13,outline:"none"}}),
+            multiUrls.length>1 && e("button",{onClick:()=>setMultiUrls(multiUrls.filter((_,j)=>j!==i)),
+              style:{padding:"8px 12px",borderRadius:8,background:"#1e293b",color:"#ef4444",border:"1px solid #ef444440",cursor:"pointer",fontWeight:700}},"✕")
+          )),
+          e("div",{style:{display:"flex",gap:8,marginTop:4}},
+            e("button",{onClick:()=>setMultiUrls([...multiUrls,""]),
+              style:{flex:1,padding:"9px",borderRadius:9,background:"#0f172a",color:"#64748b",border:"1px dashed #334155",cursor:"pointer",fontSize:13}},"+ Añadir URL"),
+            e("button",{onClick:auditMulti,disabled:loading||!validMulti.length,
+              style:{flex:2,padding:"9px",borderRadius:9,background:loading?"#4338ca":"#6366f1",color:"#fff",border:"none",cursor:"pointer",fontWeight:700,fontSize:13}},
+              loading?`Analizando...`:`🔍 Auditar ${validMulti.length} página${validMulti.length!==1?"s":""}`)
           )
         ),
         error && e("p",{style:{color:"#ef4444",fontSize:12,marginTop:8}},error)
       ),
 
-      loading && e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #334155"}},
+      // Loading single
+      loading && inputMode==="single" && e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #334155"}},
         e("div",{style:{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}},
-          [["⚡","Análisis real axe-core",1],["🔬","GEO + Heat Map",2],["✓","Completado",3]].map(([icon,label,idx])=>{
-            const done=phase>idx,active=phase===idx,skip=loadingMode==="quick"&&idx===2;
-            if(skip) return null;
-            return e("div",{key:idx,style:{display:"flex",alignItems:"center",gap:6}},
+          [["⚡","Análisis real axe-core",1],["🔬","GEO + Heat Map",2],["✓","Completado",3]].map(([icon,label,idx])=>
+            e("div",{key:idx,style:{display:"flex",alignItems:"center",gap:6}},
               e("div",{style:{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:99,fontSize:12,fontWeight:700,
-                background:done?"#052e16":active?"#1e1b4b":"#0f172a",
-                border:`1px solid ${done?"#22c55e":active?"#6366f1":"#334155"}`,
-                color:done?"#22c55e":active?"#a5b4fc":"#475569"}},
-                e("span",null,done?"✓":icon),
-                e("span",null,label),
-                active && e("span",{style:{width:7,height:7,borderRadius:"50%",background:"#6366f1",display:"inline-block",animation:"pulse 1.2s ease-in-out infinite"}})
+                background:loadPhase>idx?"#052e16":loadPhase===idx?"#1e1b4b":"#0f172a",
+                border:`1px solid ${loadPhase>idx?"#22c55e":loadPhase===idx?"#6366f1":"#334155"}`,
+                color:loadPhase>idx?"#22c55e":loadPhase===idx?"#a5b4fc":"#475569"}},
+                e("span",null,loadPhase>idx?"✓":icon),e("span",null,label),
+                loadPhase===idx && e("span",{style:{width:7,height:7,borderRadius:"50%",background:"#6366f1",display:"inline-block",animation:"pulse 1.2s ease-in-out infinite"}})
               ),
-              idx<(loadingMode==="quick"?1:2) && e("span",{style:{color:"#334155"}},"→")
-            );
-          })
+              idx<2 && e("span",{style:{color:"#334155"}},"→")
+            )
+          )
         ),
-        e("p",{style:{color:"#94a3b8",fontSize:12,margin:0}},
-          phase===1?"⚡ Analizando la web con axe-core WCAG 2.1 AA (puede tardar 15-30s)...":"🔬 Generando análisis GEO, heat map y plan de acción...")
+        e("p",{style:{color:"#94a3b8",fontSize:12,margin:0}},loadPhase===1?"⚡ Analizando la web con axe-core WCAG 2.1 AA (15-30s)...":"🔬 Generando análisis GEO, heat map y plan de acción...")
       ),
 
-      phase===2 && phase1 && e("div",{style:{background:"#1e293b",borderRadius:14,padding:20,marginBottom:12,border:"1px solid #334155",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",opacity:0.92}},
+      // Loading multi
+      loading && inputMode==="multi" && e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,marginBottom:14,border:"1px solid #334155"}},
+        e("p",{style:{color:"#a5b4fc",fontSize:13,margin:"0 0 10px",fontWeight:700}},"🔍 Analizando páginas en secuencia..."),
+        validMulti.map((u,i)=>e("div",{key:i,style:{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderTop:i>0?"1px solid #1e293b":"none"}},
+          e("span",{style:{fontSize:14}},loadStep>i?"✅":loadStep===i?"⏳":"⬜"),
+          e("span",{style:{color:"#94a3b8",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},u)
+        ))
+      ),
+
+      // Phase 1 preview
+      loading && loadPhase===2 && phase1 && e("div",{style:{background:"#1e293b",borderRadius:14,padding:20,marginBottom:12,border:"1px solid #334155",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",opacity:0.92}},
         e(ScoreRing,{score:phase1.score}),
         e("div",{style:{flex:1,minWidth:180}},
-          e("div",{style:{display:"flex",gap:6,alignItems:"center",marginBottom:4,flexWrap:"wrap"}},
+          e("div",{style:{display:"flex",gap:6,alignItems:"center",marginBottom:4}},
             e("h2",{style:{color:"#f1f5f9",margin:0,fontSize:17}},phase1.siteName),
             e("span",{style:{background:"#312e81",color:"#a5b4fc",fontSize:10,padding:"2px 8px",borderRadius:99,fontWeight:700}},"CARGANDO GEO...")
           ),
@@ -266,9 +283,49 @@ function App() {
         )
       ),
 
-      result && phase===3 && e("div",null,
+      // Resultados Multi-URL
+      multiResults.length>0 && e("div",{style:{background:"#1e293b",borderRadius:14,padding:18,marginBottom:12,border:"1px solid #334155"}},
+        e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}},
+          e("div",null,
+            e("h2",{style:{color:"#f1f5f9",margin:0,fontSize:17}},"Auditoría web completa"),
+            e("p",{style:{color:"#64748b",fontSize:12,margin:"3px 0 0"}},`${multiResults.length} páginas analizadas`)
+          ),
+          e("div",{style:{display:"flex",gap:8}},
+            e("div",{style:{textAlign:"center",background:"#0f172a",borderRadius:10,padding:"10px 16px"}},
+              e("div",{style:{fontSize:22,fontWeight:800,color:"#ef4444"}},multiResults.reduce((s,r)=>s+r.issues.length,0)),
+              e("div",{style:{fontSize:10,color:"#64748b"}},"Issues totales")),
+            e("div",{style:{textAlign:"center",background:"#0f172a",borderRadius:10,padding:"10px 16px"}},
+              e("div",{style:{fontSize:22,fontWeight:800,color:"#22c55e"}},Math.round(multiResults.reduce((s,r)=>s+r.score,0)/multiResults.length)),
+              e("div",{style:{fontSize:10,color:"#64748b"}},"Score medio")),
+            e("div",{style:{textAlign:"center",background:"#0f172a",borderRadius:10,padding:"10px 16px"}},
+              e("div",{style:{fontSize:22,fontWeight:800,color:"#ef4444"}},multiResults.reduce((s,r)=>s+(r.stats.critical||0),0)),
+              e("div",{style:{fontSize:10,color:"#64748b"}},"Críticos totales"))
+          )
+        ),
+        multiResults.map((r,i)=>{
+          const col=r.score>=70?"#22c55e":r.score>=45?"#eab308":"#ef4444";
+          return e("div",{key:i,style:{background:"#0f172a",borderRadius:10,padding:14,marginBottom:8,border:"1px solid #334155"}},
+            e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}},
+              e("div",null,
+                e("div",{style:{color:"#f1f5f9",fontWeight:700,fontSize:14}},r.siteName),
+                e("div",{style:{color:"#64748b",fontSize:11,marginTop:2}},r.url)
+              ),
+              e("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+                e("div",{style:{textAlign:"center",background:"#1e293b",borderRadius:8,padding:"6px 12px"}},
+                  e("div",{style:{fontSize:18,fontWeight:800,color:col}},r.score),
+                  e("div",{style:{fontSize:9,color:"#64748b"}},"Score")),
+                e("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},
+                  Object.entries(SEV).map(([k,s])=>r.stats[k]>0&&e("span",{key:k,style:{background:`${s.color}20`,color:s.color,fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,border:`1px solid ${s.color}40`}},`${r.stats[k]} ${s.label}`))
+                )
+              )
+            )
+          );
+        })
+      ),
 
-        e("div",{style:{display:"grid",gridTemplateColumns:result.geoScore?"repeat(auto-fit, minmax(280px, 1fr))":"1fr",gap:10,marginBottom:12}},
+      // Resultado URL única
+      result && loadPhase===3 && e("div",null,
+        e("div",{style:{display:"grid",gridTemplateColumns:result.geoScore?"repeat(auto-fit,minmax(280px,1fr))":"1fr",gap:10,marginBottom:12}},
           e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,border:"1px solid #334155",display:"flex",gap:14,alignItems:"center"}},
             e(ScoreRing,{score:result.score}),
             e("div",null,
@@ -278,7 +335,7 @@ function App() {
               e("div",{style:{display:"flex",gap:5,flexWrap:"wrap"}},
                 Object.entries(SEV).map(([k,s])=>e("span",{key:k,style:{background:`${s.color}20`,color:s.color,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,border:`1px solid ${s.color}40`}},`${result.stats[k]||0} ${s.label}`))
               ),
-              !result.geoScore && e("button",{onClick:()=>audit("full"),style:{marginTop:10,padding:"6px 14px",borderRadius:8,background:"#6366f1",color:"#fff",border:"none",cursor:"pointer",fontSize:12,fontWeight:700}},"🔬 Ver auditoría completa + GEO")
+              !result.geoScore && e("button",{onClick:()=>auditSingle("full"),style:{marginTop:10,padding:"6px 14px",borderRadius:8,background:"#6366f1",color:"#fff",border:"none",cursor:"pointer",fontSize:12,fontWeight:700}},"🔬 Ver auditoría completa + GEO")
             )
           ),
           result.geoScore && e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,border:"1px solid #6366f130",display:"flex",gap:14,alignItems:"center"}},
@@ -318,12 +375,11 @@ function App() {
 
         tab==="a11y" && e("div",{style:{background:"#1e293b",borderRadius:14,padding:18,border:"1px solid #334155"}},
           e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}},
-            e("h3",{style:{color:"#f1f5f9",margin:0,fontSize:15}},`Issues detectados (${filtered.length}) — ${result.passedChecks}/${result.totalChecks} verificaciones superadas`),
+            e("h3",{style:{color:"#f1f5f9",margin:0,fontSize:15}},`Issues detectados (${filtered.length}) · ${result.passedChecks}/${result.totalChecks} verificaciones`),
             e("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},
               ["all","critical","serious","moderate","minor"].map(f=>e("button",{key:f,onClick:()=>setFilter(f),
                 style:{padding:"3px 10px",borderRadius:99,fontSize:11,fontWeight:700,border:"none",cursor:"pointer",
-                  background:filterSev===f?(f==="all"?"#6366f1":SEV[f]?.color||"#6366f1"):"#0f172a",
-                  color:filterSev===f?"#fff":"#94a3b8"}},
+                  background:filterSev===f?(f==="all"?"#6366f1":SEV[f]?.color||"#6366f1"):"#0f172a",color:filterSev===f?"#fff":"#94a3b8"}},
                 f==="all"?"Todos":SEV[f].label))
             )
           ),
@@ -371,15 +427,14 @@ function App() {
           )),
           e("div",{style:{marginTop:14,padding:14,background:"#1a1a2e",borderRadius:9,border:"1px solid #6366f140"}},
             e("p",{style:{color:"#a5b4fc",fontSize:13,fontWeight:700,margin:"0 0 4px"}},"📊 Cumplimiento WCAG 2.1 AA"),
-            e("p",{style:{color:"#818cf8",fontSize:13,margin:0}},
-              `${result.passedChecks} de ${result.totalChecks} verificaciones superadas · ${Math.round((result.passedChecks/Math.max(result.totalChecks,1))*100)}%`)
+            e("p",{style:{color:"#818cf8",fontSize:13,margin:0}},`${result.passedChecks} de ${result.totalChecks} verificaciones · ${Math.round((result.passedChecks/Math.max(result.totalChecks,1))*100)}%`)
           )
         ),
 
         showPDF && e("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",flexDirection:"column"}},
           e("div",{style:{background:"#1e293b",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #334155",flexShrink:0}},
             e("div",null,
-              e("span",{style:{color:"#f1f5f9",fontWeight:700,fontSize:14}},`📄 Informe completo — ${result.siteName}`),
+              e("span",{style:{color:"#f1f5f9",fontWeight:700,fontSize:14}},`📄 Informe — ${result.siteName}`),
               e("span",{style:{color:"#64748b",fontSize:11,marginLeft:12}},"Ctrl+P para guardar como PDF")
             ),
             e("button",{onClick:()=>setShowPDF(false),style:{background:"#ef4444",color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",cursor:"pointer",fontWeight:700,fontSize:13}},"✕ Cerrar")
@@ -397,12 +452,10 @@ function App() {
                   e("div",{style:{display:"flex",gap:10}},
                     e("div",{style:{textAlign:"center",padding:"12px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}},
                       e("div",{style:{fontSize:32,fontWeight:"bold",color:result.score>=80?"#16a34a":result.score>=60?"#ca8a04":"#dc2626"}},result.score),
-                      e("div",{style:{fontSize:10,color:"#64748b"}},"Accesibilidad")
-                    ),
+                      e("div",{style:{fontSize:10,color:"#64748b"}},"Accesibilidad")),
                     result.geoScore && e("div",{style:{textAlign:"center",padding:"12px 18px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}},
                       e("div",{style:{fontSize:32,fontWeight:"bold",color:"#6366f1"}},result.geoScore),
-                      e("div",{style:{fontSize:10,color:"#64748b"}},"GEO · IA")
-                    )
+                      e("div",{style:{fontSize:10,color:"#64748b"}},"GEO · IA"))
                   )
                 )
               ),
@@ -416,31 +469,13 @@ function App() {
                   ))
                 )
               ),
-              result.scoreBreakdown && e("div",{style:{marginBottom:20}},
-                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},"Puntuación por principio WCAG 2.1 AA"),
-                e("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}},
-                  Object.entries(result.scoreBreakdown).map(([k,v])=>{
-                    const c=v>=80?"#16a34a":v>=60?"#ca8a04":"#dc2626";
-                    return e("div",{key:k,style:{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:6,padding:10}},
-                      e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:5}},
-                        e("span",{style:{fontSize:12,textTransform:"capitalize",color:"#374151"}},k),
-                        e("span",{style:{fontSize:14,fontWeight:"bold",color:c}},v)
-                      ),
-                      e("div",{style:{height:5,background:"#e2e8f0",borderRadius:99}},
-                        e("div",{style:{width:`${v}%`,height:"100%",background:c,borderRadius:99}})
-                      )
-                    );
-                  })
-                )
-              ),
               e("div",{style:{marginBottom:20}},
-                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},`Issues de accesibilidad detectados (${result.issues?.length||0})`),
+                e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},`Issues detectados (${result.issues?.length||0})`),
                 Object.entries(SEV).map(([k,s])=>{
                   const items=(result.issues||[]).filter(i=>i.severity===k);
                   if(!items.length) return null;
                   return e("div",{key:k,style:{marginBottom:16}},
-                    e("h3",{style:{color:s.color,fontSize:12,margin:"0 0 8px",padding:"5px 10px",background:s.bg,borderRadius:5,borderLeft:`3px solid ${s.color}`}},
-                      `${s.label.toUpperCase()} — ${items.length} issue${items.length>1?"s":""}`),
+                    e("h3",{style:{color:s.color,fontSize:12,margin:"0 0 8px",padding:"5px 10px",background:s.bg,borderRadius:5,borderLeft:`3px solid ${s.color}`}},`${s.label.toUpperCase()} — ${items.length} issue${items.length>1?"s":""}`),
                     items.map(issue=>e("div",{key:issue.id,style:{marginBottom:8,padding:10,border:"1px solid #e2e8f0",borderRadius:5}},
                       e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:4}},
                         e("strong",{style:{fontSize:12,color:"#1e293b"}},issue.title),
@@ -456,7 +491,7 @@ function App() {
               result.heatZones?.length>0 && e("div",{style:{marginBottom:20}},
                 e("h2",{style:{fontSize:14,fontWeight:"bold",marginBottom:12,color:"#1e293b"}},"🔥 Heat Insights — Mapa de atención visual"),
                 e("div",{style:{background:"#0f172a",borderRadius:8,padding:14}},
-                  e("div",{style:{display:"grid",gridTemplateColumns:"repeat(20, 1fr)",gap:2,marginBottom:10}},
+                  e("div",{style:{display:"grid",gridTemplateColumns:"repeat(20,1fr)",gap:2,marginBottom:10}},
                     result.heatZones.map((v,i)=>{const t=v/100;return e("div",{key:i,style:{height:18,borderRadius:2,background:`rgba(${Math.round(255*t)},${Math.round(80*(1-t))},${Math.round(40*(1-t))},${0.35+t*0.65})`}});})
                   ),
                   e("div",{style:{display:"flex",gap:16,fontSize:11,color:"#64748b"}},
@@ -498,19 +533,18 @@ function App() {
               e("div",{style:{borderTop:"1px solid #e2e8f0",paddingTop:12,fontSize:10,color:"#94a3b8",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}},
                 e("span",null,"Accessibility + GEO Auditor · WCAG 2.1 AA"),
                 e("span",null,new Date().toLocaleDateString("es-ES",{year:"numeric",month:"long",day:"numeric"})),
-                e("span",null,`${result.passedChecks}/${result.totalChecks} verificaciones superadas`),
-                e("span",{style:{color:"#6366f1",fontWeight:700}},
-                  "Powered by ",e("a",{href:"https://omitsis.com",style:{color:"#6366f1",textDecoration:"none"}},"Omitsis"))
+                e("span",null,`${result.passedChecks}/${result.totalChecks} verificaciones`),
+                e("span",{style:{color:"#6366f1",fontWeight:700}},"Powered by ",e("a",{href:"https://omitsis.com",style:{color:"#6366f1",textDecoration:"none"}},"Omitsis"))
               )
             )
           )
         )
       ),
 
-      !result && !loading && e("div",{style:{textAlign:"center",padding:"30px 16px",color:"#475569"}},
-        e("p",{style:{fontSize:14}},"Introduce una URL y elige el tipo de análisis"),
+      !result && !loading && multiResults.length===0 && e("div",{style:{textAlign:"center",padding:"30px 16px",color:"#475569"}},
+        e("p",{style:{fontSize:14}},"Introduce una URL o añade varias páginas para auditar toda tu web"),
         e("div",{style:{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}},
-          ["⚡ Análisis rápido real","🔬 Completo: WCAG + GEO + PDF","🔥 Heat Map","✅ Plan de acción"].map(f=>
+          ["⚡ Rápido","🔬 WCAG + GEO","🔗🔗 Multi-URL","🔥 Heat Map","📄 PDF"].map(f=>
             e("span",{key:f,style:{fontSize:12,color:"#64748b",background:"#1e293b",padding:"4px 12px",borderRadius:99,border:"1px solid #334155"}},f)
           )
         )
