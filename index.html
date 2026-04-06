@@ -29,15 +29,27 @@ const SEV = {
 };
 
 const ISSUES = [
-  { severity:"critical", title:"Imágenes sin texto alternativo", wcag:"1.1.1", category:"Perceptible", description:"Imágenes de contenido sin atributo alt descriptivo.", element:'<img src="hero.jpg">', fix:"Añadir alt descriptivo a todas las imágenes de contenido." },
-  { severity:"critical", title:"Contraste insuficiente en texto", wcag:"1.4.3", category:"Perceptible", description:"Ratio de contraste inferior al mínimo 4.5:1 requerido.", element:'<p style="color:#aaa">', fix:"Aumentar contraste a mínimo 4.5:1." },
-  { severity:"critical", title:"Formularios sin etiquetas", wcag:"1.3.1", category:"Perceptible", description:"Campos de formulario sin labels asociados.", element:'<input type="email" placeholder="Email">', fix:"Asociar cada input con un label mediante for/id o aria-label." },
-  { severity:"serious",  title:"Foco no visible en elementos", wcag:"2.4.7", category:"Operable", description:"El indicador de foco está desactivado.", element:"button { outline: none; }", fix:"Mantener o mejorar el indicador de foco." },
-  { severity:"serious",  title:"Sin landmark regions ARIA", wcag:"1.3.6", category:"Perceptible", description:"La página no define regiones semánticas.", element:'<div id="content">', fix:"Usar elementos HTML5 semánticos o roles ARIA." },
-  { severity:"moderate", title:"Links sin texto descriptivo", wcag:"2.4.4", category:"Operable", description:"Enlaces con textos genéricos como 'ver más'.", element:'<a href="/x">Ver más</a>', fix:"Usar textos de enlace descriptivos del destino." },
-  { severity:"moderate", title:"Idioma de página no declarado", wcag:"3.1.1", category:"Comprensible", description:"Falta atributo lang en el elemento html.", element:"<html>", fix:"Añadir lang='es' al elemento html." },
-  { severity:"minor",    title:"Sin skip link al contenido", wcag:"2.4.1", category:"Operable", description:"No existe enlace para saltar la navegación.", element:null, fix:"Añadir enlace 'Saltar al contenido' como primer elemento." },
-  { severity:"minor",    title:"Fuente menor a 16px en móvil", wcag:"1.4.4", category:"Perceptible", description:"Texto con tamaño inferior a 16px.", element:"p { font-size: 12px; }", fix:"Usar mínimo 16px para texto de cuerpo." },
+  { severity:"critical", title:"Imágenes sin texto alternativo", wcag:"1.1.1", description:"Imágenes de contenido sin atributo alt descriptivo, invisibles para lectores de pantalla.", element:'<img src="hero.jpg">', fix:"Añadir alt descriptivo a todas las imágenes de contenido. Usar alt='' solo en decorativas." },
+  { severity:"critical", title:"Contraste insuficiente en texto principal", wcag:"1.4.3", description:"Ratio de contraste del texto sobre fondo inferior al mínimo 4.5:1 requerido por WCAG.", element:'<p style="color:#aaa;background:#fff">', fix:"Aumentar contraste a mínimo 4.5:1 para texto normal y 3:1 para texto grande." },
+  { severity:"critical", title:"Formularios sin etiquetas asociadas", wcag:"1.3.1", description:"Campos de formulario sin labels correctamente asociados, impiden su uso con tecnologías asistivas.", element:'<input type="email" placeholder="Email">', fix:"Asociar cada input con un label mediante for/id o aria-label." },
+  { severity:"critical", title:"Navegación por teclado bloqueada", wcag:"2.1.1", description:"Componentes interactivos no accesibles mediante teclado (Tab/Enter/Space).", element:'<div onclick="open()">Menú</div>', fix:"Usar elementos nativos (<button>, <a>) o añadir tabindex='0' y manejador de teclado." },
+  { severity:"critical", title:"Vídeos sin subtítulos", wcag:"1.2.2", description:"Contenido de vídeo sin subtítulos sincronizados, inaccesible para usuarios sordos.", element:'<video src="promo.mp4"></video>', fix:"Añadir elemento <track kind='captions'> con subtítulos sincronizados." },
+  { severity:"critical", title:"Errores de formulario sin descripción", wcag:"3.3.1", description:"Los errores de validación no se comunican de forma accesible a los lectores de pantalla.", element:'<span class="error">Campo incorrecto</span>', fix:"Usar aria-describedby o aria-live para anunciar errores de formulario." },
+  { severity:"serious",  title:"Foco no visible en elementos interactivos", wcag:"2.4.7", description:"El indicador de foco está desactivado con outline:none, impide la navegación por teclado.", element:"button { outline: none; }", fix:"Mantener o mejorar el indicador de foco. Usar :focus-visible para estilizarlo." },
+  { severity:"serious",  title:"Sin landmark regions ARIA", wcag:"1.3.6", description:"La página no define regiones semánticas (main, nav, header, footer).", element:'<div id="content">', fix:"Reemplazar divs estructurales con elementos semánticos HTML5 o roles ARIA." },
+  { severity:"serious",  title:"Orden de encabezados incorrecto", wcag:"1.3.1", description:"La jerarquía H1→H6 tiene saltos que confunden a los lectores de pantalla.", element:"<h1>Título</h1><h3>Subtítulo</h3>", fix:"Mantener jerarquía secuencial de encabezados sin saltar niveles." },
+  { severity:"serious",  title:"Textos en imágenes sin alternativa", wcag:"1.4.5", description:"Información relevante presentada solo como imagen de texto.", element:'<img src="promo-text.png" alt="">', fix:"Usar texto HTML real con CSS para los efectos visuales necesarios." },
+  { severity:"serious",  title:"Timeout sin aviso al usuario", wcag:"2.2.1", description:"La sesión expira sin advertencia previa ni opción de extenderla.", element:null, fix:"Avisar al menos 20 segundos antes del timeout y permitir extenderlo." },
+  { severity:"serious",  title:"Modal sin trampa de foco", wcag:"2.1.2", description:"Los modales no atrapan el foco, permitiendo que el lector de pantalla salga del diálogo.", element:'<div role="dialog">', fix:"Implementar focus trap dentro del modal y devolver el foco al elemento que lo abrió." },
+  { severity:"moderate", title:"Links sin texto descriptivo", wcag:"2.4.4", description:"Varios enlaces usan textos genéricos como 'clic aquí' o 'ver más'.", element:'<a href="/producto">Ver más</a>', fix:"Usar textos de enlace que describan el destino fuera de contexto." },
+  { severity:"moderate", title:"Idioma de página no declarado", wcag:"3.1.1", description:"El atributo lang del elemento html está ausente o incorrecto.", element:"<html>", fix:"Añadir lang='es' (o el idioma correspondiente) al elemento <html>." },
+  { severity:"moderate", title:"Tablas sin encabezados scope", wcag:"1.3.1", description:"Las tablas de datos no usan scope en los elementos th.", element:"<th>Nombre</th>", fix:"Añadir scope='col' o scope='row' a todos los encabezados de tabla." },
+  { severity:"moderate", title:"Contenido animado sin control", wcag:"2.2.2", description:"Elementos en movimiento que no se pueden pausar ni detener.", element:'<div class="carousel auto-play">', fix:"Añadir botón de pausa/stop a cualquier contenido que se mueva automáticamente." },
+  { severity:"moderate", title:"Color como único indicador", wcag:"1.4.1", description:"El estado de los elementos (error, éxito) se comunica solo mediante color.", element:'<input style="border-color:red">', fix:"Añadir iconos, texto o patrones adicionales al color para indicar el estado." },
+  { severity:"minor",    title:"Sin skip link al contenido principal", wcag:"2.4.1", description:"No existe enlace para saltar la navegación e ir directamente al contenido.", element:null, fix:"Añadir <a href='#main' class='skip-link'>Saltar al contenido</a> como primer elemento." },
+  { severity:"minor",    title:"Tamaño de fuente menor a 16px en mobile", wcag:"1.4.4", description:"Algunos textos de cuerpo usan tamaños inferiores a 16px en móvil.", element:"p { font-size: 12px; }", fix:"Usar mínimo 16px para texto de cuerpo. Evitar tamaños fijos, usar rem/em." },
+  { severity:"minor",    title:"Autocomplete no implementado", wcag:"1.3.5", description:"Campos de datos personales sin atributo autocomplete.", element:'<input type="tel">', fix:"Añadir autocomplete apropiado: 'name', 'email', 'tel', etc." },
+  { severity:"minor",    title:"Área de clic demasiado pequeña", wcag:"2.5.5", description:"Algunos botones e iconos tienen área táctil inferior a 44x44px.", element:'<button style="width:20px;height:20px">', fix:"Garantizar área de interacción mínima de 44x44px en todos los elementos interactivos." },
 ];
 
 const GEO_ISSUES = [
@@ -133,7 +145,7 @@ function App() {
     setPhase(1);
     await new Promise(r=>setTimeout(r,900));
 
-    const issues = shuffle(ISSUES).slice(0,6+Math.floor(Math.random()*3)).map((x,i)=>({...x,id:`a${i}`}));
+    const issues = shuffle(ISSUES).map((x,i)=>({...x,id:`a${i}`}));
     const stats = {critical:0,serious:0,moderate:0,minor:0};
     issues.forEach(i=>stats[i.severity]++);
     const score = calcScore(issues);
@@ -176,8 +188,8 @@ function App() {
   const tabBtn = (id,label) => e("button",{onClick:()=>setTab(id),style:{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:tab===id?"#6366f1":"transparent",color:tab===id?"#fff":"#64748b"}},label);
   const filtered = result?.issues?.filter(i=>filterSev==="all"||i.severity===filterSev)||[];
 
-  return e("div",{style:{minHeight:"100vh",padding:"20px 14px"}},
-    e("div",{style:{maxWidth:860,margin:"0 auto"}},
+  return     e("div",{style:{minHeight:"100vh",padding:"20px 16px 0 16px"}},
+    e("div",{style:{width:"100%",maxWidth:860,margin:"0 auto"}},
 
       e("div",{style:{textAlign:"center",marginBottom:22}},
         e("div",{style:{fontSize:34,marginBottom:4}},"♿"),
@@ -245,7 +257,7 @@ function App() {
 
       result && phase===3 && e("div",null,
 
-        e("div",{style:{display:"grid",gridTemplateColumns:result.geoScore?"1fr 1fr":"1fr",gap:10,marginBottom:12}},
+        e("div",{style:{display:"grid",gridTemplateColumns:result.geoScore?"repeat(auto-fit, minmax(280px, 1fr))":"1fr",gap:10,marginBottom:12}},
           e("div",{style:{background:"#1e293b",borderRadius:12,padding:16,border:"1px solid #334155",display:"flex",gap:14,alignItems:"center"}},
             e(ScoreRing,{score:result.score}),
             e("div",null,
@@ -495,10 +507,14 @@ function App() {
                 ))
               ),
 
-              e("div",{style:{borderTop:"1px solid #e2e8f0",paddingTop:12,fontSize:10,color:"#94a3b8",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:6}},
+              e("div",{style:{borderTop:"1px solid #e2e8f0",paddingTop:12,fontSize:10,color:"#94a3b8",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}},
                 e("span",null,"Accessibility + GEO Auditor · WCAG 2.1 AA"),
                 e("span",null,new Date().toLocaleDateString("es-ES",{year:"numeric",month:"long",day:"numeric"})),
-                e("span",null,`${result.passedChecks}/${result.totalChecks} verificaciones superadas`)
+                e("span",null,`${result.passedChecks}/${result.totalChecks} verificaciones superadas`),
+                e("span",{style:{color:"#6366f1",fontWeight:700}},
+                  "Powered by ",
+                  e("a",{href:"https://omitsis.com",style:{color:"#6366f1",textDecoration:"none"}},"Omitsis")
+                )
               )
             )
           )
@@ -510,6 +526,16 @@ function App() {
         e("div",{style:{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}},
           ["⚡ Rápido: score en 5s","🔬 Completo: WCAG + GEO + PDF","🔥 Heat Map","✅ Plan de acción"].map(f=>
             e("span",{key:f,style:{fontSize:12,color:"#64748b",background:"#1e293b",padding:"4px 12px",borderRadius:99,border:"1px solid #334155"}},f)
+          )
+        )
+      ),
+
+      e("footer",{style:{textAlign:"center",padding:"24px 16px",marginTop:32,borderTop:"1px solid #1e293b"}},
+        e("p",{style:{color:"#475569",fontSize:12,margin:0}},
+          "Powered by ",
+          e("a",{href:"https://omitsis.com",target:"_blank",rel:"noopener noreferrer",
+            style:{color:"#6366f1",fontWeight:700,textDecoration:"none"}},
+            "Omitsis"
           )
         )
       )
